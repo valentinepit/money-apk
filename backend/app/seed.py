@@ -1,4 +1,4 @@
-"""Сид единственного пользователя, счёта по умолчанию и системной категории.
+"""Сид единственного пользователя и системной категории по умолчанию.
 
 Приложение одно-пользовательское (см. docs/plan.md) — регистрации нет,
 учётная запись создаётся здесь из переменных окружения ADMIN_EMAIL/ADMIN_PASSWORD.
@@ -9,10 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.database import SessionLocal
-from app.models import Account, Category, User
+from app.models import Category, User
 from app.security import hash_password
-
-DEFAULT_ACCOUNT_NAME = "Основной счёт"
 
 
 def run_seed(db: Session, settings: Settings) -> User:
@@ -21,11 +19,6 @@ def run_seed(db: Session, settings: Settings) -> User:
         user = User(email=settings.admin_email, password_hash=hash_password(settings.admin_password))
         db.add(user)
         db.flush()
-
-    account = db.query(Account).filter(Account.user_id == user.id).one_or_none()
-    if account is None:
-        account = Account(user_id=user.id, name=DEFAULT_ACCOUNT_NAME, currency="EUR")
-        db.add(account)
 
     default_category = db.query(Category).filter(Category.is_system.is_(True)).one_or_none()
     if default_category is None:

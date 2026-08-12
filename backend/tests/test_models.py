@@ -1,7 +1,6 @@
 import uuid
 
 from app.models import (
-    Account,
     Category,
     CategorizationRule,
     RuleSource,
@@ -18,27 +17,22 @@ def make_user(db_session) -> User:
     return user
 
 
-def test_create_user_account_category(db_session):
-    user = make_user(db_session)
-    account = Account(user_id=user.id, name="Основной счёт", currency="EUR")
+def test_create_user_and_category(db_session):
+    make_user(db_session)
     category = Category(name=Category.DEFAULT_CATEGORY_NAME, is_system=True)
-    db_session.add_all([account, category])
+    db_session.add(category)
     db_session.flush()
 
-    assert account.id is not None
+    assert category.id is not None
     assert category.deleted_at is None
     assert category.is_system is True
 
 
 def test_transaction_requires_category(db_session):
     user = make_user(db_session)
-    account = Account(user_id=user.id, name="Основной счёт", currency="EUR")
-    db_session.add(account)
-    db_session.flush()
 
     transaction = Transaction(
         user_id=user.id,
-        account_id=account.id,
         category_id=None,
         amount=10,
         merchant_raw="TEST SHOP",
@@ -57,14 +51,12 @@ def test_transaction_requires_category(db_session):
 
 def test_transaction_soft_delete_defaults_to_none(db_session):
     user = make_user(db_session)
-    account = Account(user_id=user.id, name="Основной счёт", currency="EUR")
     category = Category(name=Category.DEFAULT_CATEGORY_NAME, is_system=True)
-    db_session.add_all([account, category])
+    db_session.add(category)
     db_session.flush()
 
     transaction = Transaction(
         user_id=user.id,
-        account_id=account.id,
         category_id=category.id,
         amount=42.50,
         merchant_raw="REWE",

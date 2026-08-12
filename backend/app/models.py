@@ -55,22 +55,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    accounts: Mapped[list["Account"]] = relationship(back_populates="user")
     categories: Mapped[list["Category"]] = relationship(back_populates="user")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="user")
-
-
-class Account(Base):
-    __tablename__ = "accounts"
-
-    id: Mapped[uuid.UUID] = _uuid_pk()
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    bank_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    user: Mapped[User] = relationship(back_populates="accounts")
 
 
 class Category(Base):
@@ -96,7 +82,6 @@ class Transaction(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    account_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("accounts.id"), nullable=False)
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id"), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
@@ -117,17 +102,22 @@ class Transaction(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="transactions")
-    account: Mapped[Account] = relationship()
     category: Mapped[Category] = relationship()
     import_session: Mapped["ImportSession | None"] = relationship(back_populates="transactions")
 
 
 class ImportSession(Base):
+    """Одна загрузка одного файла выписки.
+
+    Счёт/банк не выбирается пользователем — bank_parser определяется автоматически
+    при парсинге по содержимому файла (см. app.import_parsers), а не по привязке
+    к какому-либо Account (сущности Account в модели нет — см. docs/plan.md).
+    """
+
     __tablename__ = "import_sessions"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    account_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("accounts.id"), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[ImportFileType] = mapped_column(
         Enum(ImportFileType, native_enum=False, length=10), nullable=False

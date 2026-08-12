@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 73cf06b3faf2
+Revision ID: ae7a18d9a093
 Revises: 
-Create Date: 2026-08-12 09:32:57.335422
+Create Date: 2026-08-12 10:10:23.181520
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '73cf06b3faf2'
+revision: str = 'ae7a18d9a093'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,16 +29,6 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')
     )
-    op.create_table('accounts',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('bank_name', sa.String(length=255), nullable=True),
-    sa.Column('currency', sa.String(length=3), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('categories',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=True),
@@ -48,6 +38,20 @@ def upgrade() -> None:
     sa.Column('is_system', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('import_sessions',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('user_id', sa.Uuid(), nullable=False),
+    sa.Column('file_name', sa.String(length=255), nullable=False),
+    sa.Column('file_type', sa.Enum('pdf', 'csv', name='importfiletype', native_enum=False, length=10), nullable=False),
+    sa.Column('bank_parser', sa.String(length=100), nullable=True),
+    sa.Column('status', sa.Enum('uploaded', 'parsed', 'failed', 'reviewed', 'confirmed', name='importsessionstatus', native_enum=False, length=20), nullable=False),
+    sa.Column('error_message', sa.Text(), nullable=True),
+    sa.Column('parsed_preview', sa.JSON(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('confirmed_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -63,26 +67,9 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('import_sessions',
-    sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('account_id', sa.Uuid(), nullable=False),
-    sa.Column('file_name', sa.String(length=255), nullable=False),
-    sa.Column('file_type', sa.Enum('pdf', 'csv', name='importfiletype', native_enum=False, length=10), nullable=False),
-    sa.Column('bank_parser', sa.String(length=100), nullable=True),
-    sa.Column('status', sa.Enum('uploaded', 'parsed', 'failed', 'reviewed', 'confirmed', name='importsessionstatus', native_enum=False, length=20), nullable=False),
-    sa.Column('error_message', sa.Text(), nullable=True),
-    sa.Column('parsed_preview', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('confirmed_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('transactions',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('account_id', sa.Uuid(), nullable=False),
     sa.Column('category_id', sa.Uuid(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=12, scale=2), nullable=False),
     sa.Column('currency', sa.String(length=3), nullable=False),
@@ -95,7 +82,6 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.ForeignKeyConstraint(['import_session_id'], ['import_sessions.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
@@ -108,9 +94,8 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('transactions')
-    op.drop_table('import_sessions')
     op.drop_table('categorization_rules')
+    op.drop_table('import_sessions')
     op.drop_table('categories')
-    op.drop_table('accounts')
     op.drop_table('users')
     # ### end Alembic commands ###

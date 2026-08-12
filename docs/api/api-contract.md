@@ -51,7 +51,7 @@
 
 Query-параметры для GET-списка: `date_from`, `date_to` (по `transaction_date`), `category_id`, `source` (`manual`/`import`), `q` (поиск по `merchant_raw`), `page`, `per_page`, `sort`.
 
-POST-тело: `{"amount": 12.50, "category_id": "...", "merchant_raw"?: "...", "note"?: "...", "transaction_date": "2026-08-10"}`. `category_id` опционален — если не передан, ставится системная категория "Другое". `source` всегда `manual` для этого эндпоинта, `account_id` не передаётся клиентом — берётся единственный Account пользователя.
+POST-тело: `{"amount": 12.50, "category_id": "...", "merchant_raw"?: "...", "note"?: "...", "transaction_date": "2026-08-10"}`. `category_id` опционален — если не передан, ставится системная категория "Другое". `source` всегда `manual` для этого эндпоинта. Привязки к счёту нет — сущности Account в модели не существует (см. `docs/api/data-model.md`).
 
 PATCH-тело: любые поля создания, частично. **Важно:** если `category_id` меняется и у транзакции есть `merchant_normalized`, сервер создаёт/обновляет личное правило (`CategorizationRule` с `source=user_rule`) — тем самым правки пользователя самообучают категоризацию при будущих импортах.
 
