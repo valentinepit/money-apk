@@ -87,6 +87,7 @@
 | error_message | string, nullable | если status = failed |
 | created_at | timestamp | |
 | confirmed_at | timestamp, nullable | когда пользователь подтвердил импорт транзакций из превью |
+| parsed_preview | JSONB, nullable | результат парсинга до подтверждения (превью строк); используется, пока статус не `confirmed` |
 
 ### CategorizationRule (правило категоризации)
 Хранит и общий словарь, и личные правила пользователя — как записи одной таблицы с разным `source`.
