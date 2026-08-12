@@ -5,7 +5,8 @@
 ## Общие конвенции
 
 - Base path: `/api/v1`.
-- Формат: JSON. Тела запросов/ответов — camelCase не используем, поля — snake_case (соответствует модели данных и Python/FastAPI).
+- Формат тел запросов: **POST и PATCH — `application/x-www-form-urlencoded`** (FastAPI `Form(...)` прямо в сигнатуре роутера, без отдельной Pydantic-модели тела), **GET-параметры — через `Query(...)`** (тоже явно в сигнатуре, включая обязательные). Это осознанное правило проекта (не JSON body для мутаций) — зафиксировано во всех бэкенд-проектах, не только здесь. Исключение: загрузка файла (`multipart/form-data`, см. Import) и `confirm` импорт-сессии, где тело — вложенный список объектов, который не выражается плоскими form-полями (см. пометку в разделе Import).
+- Формат ответов: JSON. Поля — snake_case (соответствует модели данных и Python/FastAPI), camelCase не используем.
 - Аутентификация: `Authorization: Bearer <jwt>`. Один долгоживущий access-токен, без refresh-эндпоинта (single-user, личное использование). Отзыв токена — только сменой секрета подписи на сервере (крайний случай).
 - Идентификаторы — UUID (строка).
 - Даты: `transaction_date` — `YYYY-MM-DD`; таймстемпы (`created_at`, `updated_at`, `confirmed_at`) — RFC 3339 (`2026-08-12T10:15:00Z`).
@@ -20,7 +21,7 @@
 ## Auth
 
 ### POST /api/v1/auth/login
-Тело: `{"email": "...", "password": "..."}`
+Тело (`application/x-www-form-urlencoded`): `email`, `password`.
 - 200 `{"data": {"access_token": "...", "token_type": "bearer"}}`
 - 401 неверные email/пароль
 
@@ -30,12 +31,13 @@
 
 | Метод | Путь | Описание |
 |---|---|---|
-| GET | /api/v1/categories | список (без удалённых по умолчанию) |
-| POST | /api/v1/categories | создать `{name, icon?, color?}` |
+| GET | /api/v1/categories | список (без удалённых по умолчанию); query: `include_deleted` |
+| POST | /api/v1/categories | создать; form-поля: `name`, `icon?`, `color?` |
 | GET | /api/v1/categories/:id | одна категория |
-| PATCH | /api/v1/categories/:id | обновить `{name?, icon?, color?}` |
+| PATCH | /api/v1/categories/:id | обновить; form-поля: `name?`, `icon?`, `color?` |
 | DELETE | /api/v1/categories/:id | soft-delete |
 
+- Form-поля PATCH не различают "не передано" и "передано как null" — непереданное поле трактуется как "не менять" (нельзя очистить `icon`/`color` до null через API, только оставить прежним или задать новое значение).
 - `DELETE` системной категории "Другое" → 409 `category_is_system`, запрещено.
 - `DELETE` категории, на которую ссылаются активные транзакции — не блокируем: транзакции остаются с этой `category_id`, но т.к. категория помечена `deleted_at`, в UI выбора категорий она не показывается (кроме как "текущая категория" уже проставленной транзакции).
 
@@ -49,16 +51,16 @@
 | PATCH | /api/v1/transactions/:id | частичное обновление |
 | DELETE | /api/v1/transactions/:id | soft-delete |
 
-Query-параметры для GET-списка: `date_from`, `date_to` (по `transaction_date`), `category_id`, `source` (`manual`/`import`), `q` (поиск по `merchant_raw`), `page`, `per_page`, `sort`.
+Query-параметры для GET-списка (все через `Query(...)`): `date_from`, `date_to` (по `transaction_date`), `category_id`, `source` (`manual`/`import`), `q` (поиск по `merchant_raw`), `page`, `per_page`, `include_deleted`, `sort`.
 
-POST-тело: `{"amount": 12.50, "category_id": "...", "merchant_raw"?: "...", "note"?: "...", "transaction_date": "2026-08-10"}`. `category_id` опционален — если не передан, ставится системная категория "Другое". `source` всегда `manual` для этого эндпоинта. Привязки к счёту нет — сущности Account в модели не существует (см. `docs/api/data-model.md`).
+POST-тело (`application/x-www-form-urlencoded`): `amount`, `category_id?`, `merchant_raw?`, `note?`, `transaction_date`. `category_id` опционален — если не передан, ставится системная категория "Другое". `source` всегда `manual` для этого эндпоинта. Привязки к счёту нет — сущности Account в модели не существует (см. `docs/api/data-model.md`).
 
-PATCH-тело: любые поля создания, частично. **Важно:** если `category_id` меняется и у транзакции есть `merchant_normalized`, сервер создаёт/обновляет личное правило (`CategorizationRule` с `source=user_rule`) — тем самым правки пользователя самообучают категоризацию при будущих импортах.
+PATCH-тело (form): те же поля, частично — как и у категорий, непереданное form-поле трактуется как "не менять" (не как явный null). **Важно:** если `category_id` меняется и у транзакции есть `merchant_normalized`, сервер создаёт/обновляет личное правило (`CategorizationRule` с `source=user_rule`) — тем самым правки пользователя самообучают категоризацию при будущих импортах.
 
 ## Reports
 
 ### GET /api/v1/reports/by-category
-Query: `date_from`, `date_to` (обязательные).
+Query (`Query(...)`, обе обязательные): `date_from`, `date_to`.
 - 200 `{"data": [{"category_id": "...", "category_name": "...", "total": 123.45, "count": 7}], "meta": {"date_from": "...", "date_to": "...", "total_overall": 456.78}}`
 - Сортировка результата — по `total` по убыванию.
 
@@ -104,7 +106,7 @@ Query: `date_from`, `date_to` (обязательные).
    ```
    При `status=failed` → 422, `error_message` в объекте сессии.
 
-2. **POST /api/v1/import-sessions/:id/confirm** — тело содержит финальный список строк (пользователь мог поменять категорию или исключить строку в приложении):
+2. **POST /api/v1/import-sessions/:id/confirm** — тело содержит финальный список строк (пользователь мог поменять категорию или исключить строку в приложении). **Исключение из правила "POST — через Form":** это вложенный список объектов, который не выражается плоскими form-полями, поэтому здесь тело остаётся JSON (`application/json`) — решить окончательно перед реализацией фазы 5:
    ```json
    {"transactions": [{"line_no": 1, "category_id": "...", "exclude": false}]}
    ```

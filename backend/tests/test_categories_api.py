@@ -73,7 +73,7 @@ async def test_list_categories_excludes_deleted_by_default(client, auth_headers,
 
 async def test_create_category(client, auth_headers):
     response = await client.post(
-        "/api/v1/categories", json={"name": "Транспорт", "icon": "bus"}, headers=auth_headers
+        "/api/v1/categories", data={"name": "Транспорт", "icon": "bus"}, headers=auth_headers
     )
     assert response.status_code == 201
     body = response.json()["data"]
@@ -88,7 +88,7 @@ async def test_update_category(client, auth_headers, db_session, user):
     await db_session.flush()
 
     response = await client.patch(
-        f"/api/v1/categories/{category.id}", json={"name": "Транспорт и авто"}, headers=auth_headers
+        f"/api/v1/categories/{category.id}", data={"name": "Транспорт и авто"}, headers=auth_headers
     )
     assert response.status_code == 200
     assert response.json()["data"]["name"] == "Транспорт и авто"
@@ -97,7 +97,7 @@ async def test_update_category(client, auth_headers, db_session, user):
 async def test_update_unknown_category_returns_404(client, auth_headers):
     response = await client.patch(
         "/api/v1/categories/00000000-0000-0000-0000-000000000000",
-        json={"name": "x"},
+        data={"name": "x"},
         headers=auth_headers,
     )
     assert response.status_code == 404

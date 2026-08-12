@@ -1,12 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Form, Query, Response
 
 from app.deps import get_current_user, get_uow
 from app.errors import conflict, not_found
 from app.exceptions import CategoryIsSystemError, NotFoundError
 from app.models import User
-from app.schemas import CategoryCreate, CategoryDataResponse, CategoryListResponse, CategoryOut, CategoryUpdate
+from app.schemas import CategoryDataResponse, CategoryListResponse, CategoryOut
 from app.services import category_service
 from app.unit_of_work import AbstractUnitOfWork
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/v1/categories", tags=["categories"])
 
 @router.get("", response_model=CategoryListResponse)
 async def list_categories(
-    include_deleted: bool = False,
+    include_deleted: bool = Query(False),
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> CategoryListResponse:
@@ -25,13 +25,13 @@ async def list_categories(
 
 @router.post("", status_code=201, response_model=CategoryDataResponse)
 async def create_category(
-    payload: CategoryCreate,
+    name: str = Form(...),
+    icon: str | None = Form(None),
+    color: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> CategoryDataResponse:
-    category = await category_service.create_category(
-        uow, current_user.id, name=payload.name, icon=payload.icon, color=payload.color
-    )
+    category = await category_service.create_category(uow, current_user.id, name=name, icon=icon, color=color)
     return CategoryDataResponse(data=CategoryOut.model_validate(category))
 
 
@@ -51,11 +51,17 @@ async def get_category(
 @router.patch("/{category_id}", response_model=CategoryDataResponse)
 async def update_category(
     category_id: uuid.UUID,
-    payload: CategoryUpdate,
+    name: str | None = Form(None),
+    icon: str | None = Form(None),
+    color: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> CategoryDataResponse:
-    updates = payload.model_dump(exclude_unset=True)
+    # Form-поля не различают "поле не передано" и "поле передано как null" —
+    # трактуем непереданное (None) как "не менять" (см. правило проекта:
+    # POST/PATCH — через Form, а не Pydantic-body с exclude_unset).
+    updates = {"name": name, "icon": icon, "color": color}
+    updates = {field: value for field, value in updates.items() if value is not None}
     try:
         category = await category_service.update_category(uow, current_user.id, category_id, updates)
     except NotFoundError as exc:

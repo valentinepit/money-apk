@@ -38,7 +38,7 @@ async def seeded_user(db_session):
 
 async def test_login_with_correct_credentials_returns_token(client, seeded_user):
     response = await client.post(
-        "/api/v1/auth/login", json={"email": "admin@example.com", "password": "admin-pass"}
+        "/api/v1/auth/login", data={"email": "admin@example.com", "password": "admin-pass"}
     )
     assert response.status_code == 200
     body = response.json()
@@ -48,7 +48,7 @@ async def test_login_with_correct_credentials_returns_token(client, seeded_user)
 
 async def test_login_with_wrong_password_returns_401(client, seeded_user):
     response = await client.post(
-        "/api/v1/auth/login", json={"email": "admin@example.com", "password": "wrong"}
+        "/api/v1/auth/login", data={"email": "admin@example.com", "password": "wrong"}
     )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
@@ -56,7 +56,7 @@ async def test_login_with_wrong_password_returns_401(client, seeded_user):
 
 async def test_login_with_unknown_email_returns_401(client):
     response = await client.post(
-        "/api/v1/auth/login", json={"email": "nobody@example.com", "password": "whatever"}
+        "/api/v1/auth/login", data={"email": "nobody@example.com", "password": "whatever"}
     )
     assert response.status_code == 401
 
@@ -68,7 +68,7 @@ async def test_me_without_token_returns_401(client):
 
 async def test_me_with_valid_token_returns_current_user(client, seeded_user):
     login_response = await client.post(
-        "/api/v1/auth/login", json={"email": "admin@example.com", "password": "admin-pass"}
+        "/api/v1/auth/login", data={"email": "admin@example.com", "password": "admin-pass"}
     )
     token = login_response.json()["data"]["access_token"]
 

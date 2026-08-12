@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.deps import get_current_user, get_uow
 from app.models import User
@@ -13,8 +13,8 @@ router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 @router.get("/by-category", response_model=ReportListResponse)
 async def report_by_category(
-    date_from: date,
-    date_to: date,
+    date_from: date = Query(...),
+    date_to: date = Query(...),
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> ReportListResponse:

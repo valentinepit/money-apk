@@ -74,7 +74,7 @@ async def test_create_transaction_without_category_defaults_to_other(
 ):
     response = await client.post(
         "/api/v1/transactions",
-        json={"amount": 12.5, "merchant_raw": "REWE 123", "transaction_date": "2026-08-05"},
+        data={"amount": 12.5, "merchant_raw": "REWE 123", "transaction_date": "2026-08-05"},
         headers=auth_headers,
     )
     assert response.status_code == 201
@@ -87,7 +87,7 @@ async def test_create_transaction_without_category_defaults_to_other(
 async def test_create_transaction_with_category(client, auth_headers, groceries_category):
     response = await client.post(
         "/api/v1/transactions",
-        json={
+        data={
             "amount": 5,
             "category_id": str(groceries_category.id),
             "transaction_date": "2026-08-05",
@@ -212,7 +212,7 @@ async def test_update_transaction_category_creates_user_rule(
 
     response = await client.patch(
         f"/api/v1/transactions/{transaction.id}",
-        json={"category_id": str(groceries_category.id)},
+        data={"category_id": str(groceries_category.id)},
         headers=auth_headers,
     )
     assert response.status_code == 200
@@ -255,7 +255,7 @@ async def test_update_transaction_category_upserts_existing_rule(
 
     await client.patch(
         f"/api/v1/transactions/{transaction.id}",
-        json={"category_id": str(groceries_category.id)},
+        data={"category_id": str(groceries_category.id)},
         headers=auth_headers,
     )
 

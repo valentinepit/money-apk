@@ -3,10 +3,11 @@ from datetime import date
 
 from pydantic import BaseModel, EmailStr
 
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+# Тела запросов (POST/PATCH) описываются параметрами Form(...) прямо в роутерах
+# (см. app/routers/*.py), а не отдельными Pydantic-моделями — по правилу проекта
+# "POST/PATCH — через Form, GET — через Query". Здесь остаются только схемы
+# ОТВЕТОВ (*Out, конверты *Response) — их FastAPI всё ещё валидирует через
+# response_model=.
 
 
 class TokenResponse(BaseModel):
@@ -21,18 +22,6 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class CategoryCreate(BaseModel):
-    name: str
-    icon: str | None = None
-    color: str | None = None
-
-
-class CategoryUpdate(BaseModel):
-    name: str | None = None
-    icon: str | None = None
-    color: str | None = None
-
-
 class CategoryOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -41,22 +30,6 @@ class CategoryOut(BaseModel):
     is_system: bool
 
     model_config = {"from_attributes": True}
-
-
-class TransactionCreate(BaseModel):
-    amount: float
-    category_id: uuid.UUID | None = None
-    merchant_raw: str | None = None
-    note: str | None = None
-    transaction_date: date
-
-
-class TransactionUpdate(BaseModel):
-    amount: float | None = None
-    category_id: uuid.UUID | None = None
-    merchant_raw: str | None = None
-    note: str | None = None
-    transaction_date: date | None = None
 
 
 class TransactionOut(BaseModel):
