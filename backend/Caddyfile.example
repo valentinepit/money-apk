@@ -1,0 +1,5 @@
+# Скопировать в Caddyfile и заменить домен на свой.
+# Caddy сам получит и обновит сертификат Let's Encrypt (HTTPS из коробки).
+your-domain.example.com {
+    reverse_proxy api:8000
+}
