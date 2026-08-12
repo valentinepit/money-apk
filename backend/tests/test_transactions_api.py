@@ -1,35 +1,49 @@
-import pytest
-from fastapi.testclient import TestClient
+from datetime import date, datetime, timezone
 
-from app.database import get_db
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+
+from app.deps import get_uow
 from app.main import app
 from app.models import Category, CategorizationRule, RuleSource, Transaction, TransactionSource, User
 from app.security import create_access_token, hash_password
+from app.unit_of_work import SqlAlchemyUnitOfWork
 
 
 @pytest.fixture
-def client(db_session):
-    def override_get_db():
-        yield db_session
+async def client(db_session):
+    # Один и тот же (уже "открытый") UoW отдаётся на каждый HTTP-запрос внутри
+    # теста — иначе __aexit__ каждого отдельного запроса делал бы rollback()
+    # общего с фикстурами savepoint'а и стирал бы данные, подготовленные для
+    # теста (или предыдущим запросом) до того, как дошли до текущего запроса.
+    uow = SqlAlchemyUnitOfWork(session=db_session)
+    await uow.__aenter__()
 
-    app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    async def override_get_uow():
+        yield uow
+
+    app.dependency_overrides[get_uow] = override_get_uow
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
     app.dependency_overrides.clear()
+    await uow.__aexit__(None, None, None)
 
 
 @pytest.fixture
-def user(db_session) -> User:
+async def user(db_session) -> User:
     user = User(email="owner@example.com", password_hash=hash_password("pass"))
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
     return user
 
 
 @pytest.fixture
-def other_user(db_session) -> User:
+async def other_user(db_session) -> User:
     user = User(email="other@example.com", password_hash=hash_password("pass"))
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
     return user
 
 
@@ -40,25 +54,25 @@ def auth_headers(user):
 
 
 @pytest.fixture
-def default_category(db_session) -> Category:
+async def default_category(db_session) -> Category:
     category = Category(name=Category.DEFAULT_CATEGORY_NAME, is_system=True)
     db_session.add(category)
-    db_session.flush()
+    await db_session.flush()
     return category
 
 
 @pytest.fixture
-def groceries_category(db_session, user) -> Category:
+async def groceries_category(db_session, user) -> Category:
     category = Category(user_id=user.id, name="Продукты")
     db_session.add(category)
-    db_session.flush()
+    await db_session.flush()
     return category
 
 
-def test_create_transaction_without_category_defaults_to_other(
+async def test_create_transaction_without_category_defaults_to_other(
     client, auth_headers, default_category
 ):
-    response = client.post(
+    response = await client.post(
         "/api/v1/transactions",
         json={"amount": 12.5, "merchant_raw": "REWE 123", "transaction_date": "2026-08-05"},
         headers=auth_headers,
@@ -70,8 +84,8 @@ def test_create_transaction_without_category_defaults_to_other(
     assert body["amount"] == 12.5
 
 
-def test_create_transaction_with_category(client, auth_headers, groceries_category):
-    response = client.post(
+async def test_create_transaction_with_category(client, auth_headers, groceries_category):
+    response = await client.post(
         "/api/v1/transactions",
         json={
             "amount": 5,
@@ -84,7 +98,7 @@ def test_create_transaction_with_category(client, auth_headers, groceries_catego
     assert response.json()["data"]["category_id"] == str(groceries_category.id)
 
 
-def test_list_transactions_excludes_deleted_and_paginates(
+async def test_list_transactions_excludes_deleted_and_paginates(
     client, auth_headers, db_session, user, default_category
 ):
     for i in range(3):
@@ -95,7 +109,7 @@ def test_list_transactions_excludes_deleted_and_paginates(
                 amount=1 + i,
                 merchant_raw="SHOP",
                 merchant_normalized="SHOP",
-                transaction_date=f"2026-08-0{i + 1}",
+                transaction_date=date(2026, 8, i + 1),
                 source=TransactionSource.manual,
             )
         )
@@ -105,14 +119,14 @@ def test_list_transactions_excludes_deleted_and_paginates(
         amount=99,
         merchant_raw="OLD",
         merchant_normalized="OLD",
-        transaction_date="2026-08-01",
+        transaction_date=date(2026, 8, 1),
         source=TransactionSource.manual,
-        deleted_at="2026-01-01T00:00:00Z",
+        deleted_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
     db_session.add(deleted)
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.get("/api/v1/transactions?per_page=2&page=1", headers=auth_headers)
+    response = await client.get("/api/v1/transactions?per_page=2&page=1", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert body["meta"]["total"] == 3
@@ -120,7 +134,7 @@ def test_list_transactions_excludes_deleted_and_paginates(
     assert len(body["data"]) == 2
 
 
-def test_list_transactions_filters_by_date_range(
+async def test_list_transactions_filters_by_date_range(
     client, auth_headers, db_session, user, default_category
 ):
     in_range = Transaction(
@@ -129,7 +143,7 @@ def test_list_transactions_filters_by_date_range(
         amount=1,
         merchant_raw="IN",
         merchant_normalized="IN",
-        transaction_date="2026-08-05",
+        transaction_date=date(2026, 8, 5),
         source=TransactionSource.manual,
     )
     out_of_range = Transaction(
@@ -138,13 +152,13 @@ def test_list_transactions_filters_by_date_range(
         amount=2,
         merchant_raw="OUT",
         merchant_normalized="OUT",
-        transaction_date="2026-01-01",
+        transaction_date=date(2026, 1, 1),
         source=TransactionSource.manual,
     )
     db_session.add_all([in_range, out_of_range])
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.get(
+    response = await client.get(
         "/api/v1/transactions?date_from=2026-08-01&date_to=2026-08-31", headers=auth_headers
     )
     assert response.status_code == 200
@@ -152,7 +166,7 @@ def test_list_transactions_filters_by_date_range(
     assert merchants == {"IN"}
 
 
-def test_transactions_are_scoped_to_current_user(
+async def test_transactions_are_scoped_to_current_user(
     client, auth_headers, db_session, user, other_user, default_category
 ):
     mine = Transaction(
@@ -161,7 +175,7 @@ def test_transactions_are_scoped_to_current_user(
         amount=1,
         merchant_raw="MINE",
         merchant_normalized="MINE",
-        transaction_date="2026-08-05",
+        transaction_date=date(2026, 8, 5),
         source=TransactionSource.manual,
     )
     theirs = Transaction(
@@ -170,18 +184,18 @@ def test_transactions_are_scoped_to_current_user(
         amount=1,
         merchant_raw="THEIRS",
         merchant_normalized="THEIRS",
-        transaction_date="2026-08-05",
+        transaction_date=date(2026, 8, 5),
         source=TransactionSource.manual,
     )
     db_session.add_all([mine, theirs])
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.get("/api/v1/transactions", headers=auth_headers)
+    response = await client.get("/api/v1/transactions", headers=auth_headers)
     merchants = {t["merchant_raw"] for t in response.json()["data"]}
     assert merchants == {"MINE"}
 
 
-def test_update_transaction_category_creates_user_rule(
+async def test_update_transaction_category_creates_user_rule(
     client, auth_headers, db_session, user, default_category, groceries_category
 ):
     transaction = Transaction(
@@ -190,13 +204,13 @@ def test_update_transaction_category_creates_user_rule(
         amount=10,
         merchant_raw="REWE 42",
         merchant_normalized="REWE",
-        transaction_date="2026-08-05",
+        transaction_date=date(2026, 8, 5),
         source=TransactionSource.manual,
     )
     db_session.add(transaction)
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.patch(
+    response = await client.patch(
         f"/api/v1/transactions/{transaction.id}",
         json={"category_id": str(groceries_category.id)},
         headers=auth_headers,
@@ -205,18 +219,18 @@ def test_update_transaction_category_creates_user_rule(
     assert response.json()["data"]["category_id"] == str(groceries_category.id)
 
     rule = (
-        db_session.query(CategorizationRule)
-        .filter(
-            CategorizationRule.user_id == user.id,
-            CategorizationRule.merchant_pattern == "REWE",
+        await db_session.scalars(
+            select(CategorizationRule).where(
+                CategorizationRule.user_id == user.id,
+                CategorizationRule.merchant_pattern == "REWE",
+            )
         )
-        .one()
-    )
+    ).one()
     assert rule.category_id == groceries_category.id
     assert rule.source == RuleSource.user_rule
 
 
-def test_update_transaction_category_upserts_existing_rule(
+async def test_update_transaction_category_upserts_existing_rule(
     client, auth_headers, db_session, user, default_category, groceries_category
 ):
     existing_rule = CategorizationRule(
@@ -233,53 +247,56 @@ def test_update_transaction_category_upserts_existing_rule(
         amount=10,
         merchant_raw="REWE 42",
         merchant_normalized="REWE",
-        transaction_date="2026-08-05",
+        transaction_date=date(2026, 8, 5),
         source=TransactionSource.manual,
     )
     db_session.add(transaction)
-    db_session.flush()
+    await db_session.flush()
 
-    client.patch(
+    await client.patch(
         f"/api/v1/transactions/{transaction.id}",
         json={"category_id": str(groceries_category.id)},
         headers=auth_headers,
     )
 
     rules = (
-        db_session.query(CategorizationRule)
-        .filter(
-            CategorizationRule.user_id == user.id,
-            CategorizationRule.merchant_pattern == "REWE",
+        await db_session.scalars(
+            select(CategorizationRule).where(
+                CategorizationRule.user_id == user.id,
+                CategorizationRule.merchant_pattern == "REWE",
+            )
         )
-        .all()
-    )
+    ).all()
     assert len(rules) == 1
     assert rules[0].category_id == groceries_category.id
 
 
-def test_delete_transaction_soft_deletes(client, auth_headers, db_session, user, default_category):
+async def test_delete_transaction_soft_deletes(
+    client, auth_headers, db_session, user, default_category
+):
     transaction = Transaction(
         user_id=user.id,
         category_id=default_category.id,
         amount=10,
         merchant_raw="SHOP",
         merchant_normalized="SHOP",
-        transaction_date="2026-08-05",
+        transaction_date=date(2026, 8, 5),
         source=TransactionSource.manual,
     )
     db_session.add(transaction)
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.delete(f"/api/v1/transactions/{transaction.id}", headers=auth_headers)
+    transaction_id = transaction.id
+    response = await client.delete(f"/api/v1/transactions/{transaction_id}", headers=auth_headers)
     assert response.status_code == 204
 
     db_session.expire_all()
-    refreshed = db_session.get(Transaction, transaction.id)
+    refreshed = await db_session.get(Transaction, transaction_id)
     assert refreshed.deleted_at is not None
 
 
-def test_get_unknown_transaction_returns_404(client, auth_headers):
-    response = client.get(
+async def test_get_unknown_transaction_returns_404(client, auth_headers):
+    response = await client.get(
         "/api/v1/transactions/00000000-0000-0000-0000-000000000000", headers=auth_headers
     )
     assert response.status_code == 404

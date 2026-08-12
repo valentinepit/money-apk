@@ -5,38 +5,39 @@
 Скрипт идемпотентен: повторный запуск не создаёт дублей.
 """
 
-from sqlalchemy.orm import Session
+import asyncio
 
 from app.config import Settings, get_settings
-from app.database import SessionLocal
 from app.models import Category, User
 from app.security import hash_password
+from app.unit_of_work import AbstractUnitOfWork, SqlAlchemyUnitOfWork
 
 
-def run_seed(db: Session, settings: Settings) -> User:
-    user = db.query(User).filter(User.email == settings.admin_email).one_or_none()
+async def run_seed(uow: AbstractUnitOfWork, settings: Settings) -> User:
+    user = await uow.users.get_by_email(settings.admin_email)
     if user is None:
         user = User(email=settings.admin_email, password_hash=hash_password(settings.admin_password))
-        db.add(user)
-        db.flush()
+        await uow.users.add(user)
+        await uow.session.flush()
 
-    default_category = db.query(Category).filter(Category.is_system.is_(True)).one_or_none()
+    default_category = await uow.categories.get_default()
     if default_category is None:
         default_category = Category(name=Category.DEFAULT_CATEGORY_NAME, is_system=True)
-        db.add(default_category)
+        await uow.categories.add(default_category)
 
-    db.commit()
+    await uow.commit()
     return user
 
 
-def main() -> None:
+async def _run_seed_with_new_uow() -> User:
     settings = get_settings()
-    db = SessionLocal()
-    try:
-        user = run_seed(db, settings)
-        print(f"Сид готов: пользователь {user.email}")
-    finally:
-        db.close()
+    async with SqlAlchemyUnitOfWork() as uow:
+        return await run_seed(uow, settings)
+
+
+def main() -> None:
+    user = asyncio.run(_run_seed_with_new_uow())
+    print(f"Сид готов: пользователь {user.email}")
 
 
 if __name__ == "__main__":

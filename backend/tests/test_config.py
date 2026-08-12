@@ -1,5 +1,3 @@
-import os
-
 from app.config import Settings
 
 
@@ -16,3 +14,19 @@ def test_settings_reads_from_env(monkeypatch):
     assert settings.admin_email == "admin@example.com"
     assert settings.jwt_algorithm == "HS256"
     assert settings.jwt_expires_minutes > 0
+
+
+def test_async_database_url_swaps_driver_to_asyncpg(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg2://user:pass@localhost/dbname")
+
+    settings = Settings()
+
+    assert settings.async_database_url == "postgresql+asyncpg://user:pass@localhost/dbname"
+
+
+def test_async_database_url_works_without_explicit_driver(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/dbname")
+
+    settings = Settings()
+
+    assert settings.async_database_url == "postgresql+asyncpg://user:pass@localhost/dbname"

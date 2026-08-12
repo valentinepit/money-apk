@@ -1,7 +1,8 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.1
 sqlalchemy==2.0.52
-psycopg2-binary==2.9.12
+asyncpg==0.31.0  # приложение (async engine/session)
+psycopg2-binary==2.9.12  # только Alembic-миграции (см. alembic/env.py) — они синхронные
 alembic==1.19.1
 pydantic[email]==2.13.4
 pydantic-settings==2.15.0

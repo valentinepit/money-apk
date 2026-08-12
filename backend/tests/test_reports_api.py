@@ -1,27 +1,40 @@
-import pytest
-from fastapi.testclient import TestClient
+from datetime import date, datetime, timezone
 
-from app.database import get_db
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.deps import get_uow
 from app.main import app
 from app.models import Category, Transaction, TransactionSource, User
 from app.security import create_access_token, hash_password
+from app.unit_of_work import SqlAlchemyUnitOfWork
 
 
 @pytest.fixture
-def client(db_session):
-    def override_get_db():
-        yield db_session
+async def client(db_session):
+    # Один и тот же (уже "открытый") UoW отдаётся на каждый HTTP-запрос внутри
+    # теста — иначе __aexit__ каждого отдельного запроса делал бы rollback()
+    # общего с фикстурами savepoint'а и стирал бы данные, подготовленные для
+    # теста (или предыдущим запросом) до того, как дошли до текущего запроса.
+    uow = SqlAlchemyUnitOfWork(session=db_session)
+    await uow.__aenter__()
 
-    app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    async def override_get_uow():
+        yield uow
+
+    app.dependency_overrides[get_uow] = override_get_uow
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
     app.dependency_overrides.clear()
+    await uow.__aexit__(None, None, None)
 
 
 @pytest.fixture
-def user(db_session) -> User:
+async def user(db_session) -> User:
     user = User(email="owner@example.com", password_hash=hash_password("pass"))
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
     return user
 
 
@@ -31,17 +44,17 @@ def auth_headers(user):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_report_by_category_sums_and_sorts_desc(client, auth_headers, db_session, user):
+async def test_report_by_category_sums_and_sorts_desc(client, auth_headers, db_session, user):
     groceries = Category(user_id=user.id, name="Продукты")
     transport = Category(user_id=user.id, name="Транспорт")
     db_session.add_all([groceries, transport])
-    db_session.flush()
+    await db_session.flush()
 
     rows = [
-        (groceries.id, 10, "2026-08-01"),
-        (groceries.id, 15, "2026-08-02"),
-        (transport.id, 50, "2026-08-03"),
-        (groceries.id, 5, "2026-01-01"),  # вне диапазона
+        (groceries.id, 10, date(2026, 8, 1)),
+        (groceries.id, 15, date(2026, 8, 2)),
+        (transport.id, 50, date(2026, 8, 3)),
+        (groceries.id, 5, date(2026, 1, 1)),  # вне диапазона
     ]
     for category_id, amount, tx_date in rows:
         db_session.add(
@@ -55,9 +68,9 @@ def test_report_by_category_sums_and_sorts_desc(client, auth_headers, db_session
                 source=TransactionSource.manual,
             )
         )
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.get(
+    response = await client.get(
         "/api/v1/reports/by-category?date_from=2026-08-01&date_to=2026-08-31",
         headers=auth_headers,
     )
@@ -71,10 +84,12 @@ def test_report_by_category_sums_and_sorts_desc(client, auth_headers, db_session
     assert groceries_row["count"] == 2
 
 
-def test_report_by_category_excludes_deleted_transactions(client, auth_headers, db_session, user):
+async def test_report_by_category_excludes_deleted_transactions(
+    client, auth_headers, db_session, user
+):
     category = Category(user_id=user.id, name="Продукты")
     db_session.add(category)
-    db_session.flush()
+    await db_session.flush()
 
     db_session.add(
         Transaction(
@@ -83,14 +98,14 @@ def test_report_by_category_excludes_deleted_transactions(client, auth_headers, 
             amount=100,
             merchant_raw="X",
             merchant_normalized="X",
-            transaction_date="2026-08-01",
+            transaction_date=date(2026, 8, 1),
             source=TransactionSource.manual,
-            deleted_at="2026-01-01T00:00:00Z",
+            deleted_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         )
     )
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.get(
+    response = await client.get(
         "/api/v1/reports/by-category?date_from=2026-08-01&date_to=2026-08-31",
         headers=auth_headers,
     )
@@ -98,6 +113,6 @@ def test_report_by_category_excludes_deleted_transactions(client, auth_headers, 
     assert response.json()["meta"]["total_overall"] == 0
 
 
-def test_report_by_category_requires_date_range(client, auth_headers):
-    response = client.get("/api/v1/reports/by-category", headers=auth_headers)
+async def test_report_by_category_requires_date_range(client, auth_headers):
+    response = await client.get("/api/v1/reports/by-category", headers=auth_headers)
     assert response.status_code == 422

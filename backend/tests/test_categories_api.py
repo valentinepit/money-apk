@@ -1,27 +1,40 @@
-import pytest
-from fastapi.testclient import TestClient
+from datetime import datetime, timezone
 
-from app.database import get_db
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.deps import get_uow
 from app.main import app
 from app.models import Category, User
 from app.security import create_access_token, hash_password
+from app.unit_of_work import SqlAlchemyUnitOfWork
 
 
 @pytest.fixture
-def client(db_session):
-    def override_get_db():
-        yield db_session
+async def client(db_session):
+    # Один и тот же (уже "открытый") UoW отдаётся на каждый HTTP-запрос внутри
+    # теста — иначе __aexit__ каждого отдельного запроса делал бы rollback()
+    # общего с фикстурами savepoint'а и стирал бы данные, подготовленные для
+    # теста (или предыдущим запросом) до того, как дошли до текущего запроса.
+    uow = SqlAlchemyUnitOfWork(session=db_session)
+    await uow.__aenter__()
 
-    app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    async def override_get_uow():
+        yield uow
+
+    app.dependency_overrides[get_uow] = override_get_uow
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
     app.dependency_overrides.clear()
+    await uow.__aexit__(None, None, None)
 
 
 @pytest.fixture
-def user(db_session) -> User:
+async def user(db_session) -> User:
     user = User(email="owner@example.com", password_hash=hash_password("pass"))
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
     return user
 
 
@@ -32,32 +45,34 @@ def auth_headers(user):
 
 
 @pytest.fixture
-def default_category(db_session) -> Category:
+async def default_category(db_session) -> Category:
     category = Category(name=Category.DEFAULT_CATEGORY_NAME, is_system=True)
     db_session.add(category)
-    db_session.flush()
+    await db_session.flush()
     return category
 
 
-def test_list_categories_requires_auth(client):
-    response = client.get("/api/v1/categories")
+async def test_list_categories_requires_auth(client):
+    response = await client.get("/api/v1/categories")
     assert response.status_code == 401
 
 
-def test_list_categories_excludes_deleted_by_default(client, auth_headers, db_session, user):
+async def test_list_categories_excludes_deleted_by_default(client, auth_headers, db_session, user):
     active = Category(user_id=user.id, name="Продукты")
-    deleted = Category(user_id=user.id, name="Старая", deleted_at="2026-01-01T00:00:00Z")
+    deleted = Category(
+        user_id=user.id, name="Старая", deleted_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
     db_session.add_all([active, deleted])
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.get("/api/v1/categories", headers=auth_headers)
+    response = await client.get("/api/v1/categories", headers=auth_headers)
     assert response.status_code == 200
     names = {c["name"] for c in response.json()["data"]}
     assert names == {"Продукты"}
 
 
-def test_create_category(client, auth_headers):
-    response = client.post(
+async def test_create_category(client, auth_headers):
+    response = await client.post(
         "/api/v1/categories", json={"name": "Транспорт", "icon": "bus"}, headers=auth_headers
     )
     assert response.status_code == 201
@@ -67,20 +82,20 @@ def test_create_category(client, auth_headers):
     assert body["is_system"] is False
 
 
-def test_update_category(client, auth_headers, db_session, user):
+async def test_update_category(client, auth_headers, db_session, user):
     category = Category(user_id=user.id, name="Транспорт")
     db_session.add(category)
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.patch(
+    response = await client.patch(
         f"/api/v1/categories/{category.id}", json={"name": "Транспорт и авто"}, headers=auth_headers
     )
     assert response.status_code == 200
     assert response.json()["data"]["name"] == "Транспорт и авто"
 
 
-def test_update_unknown_category_returns_404(client, auth_headers):
-    response = client.patch(
+async def test_update_unknown_category_returns_404(client, auth_headers):
+    response = await client.patch(
         "/api/v1/categories/00000000-0000-0000-0000-000000000000",
         json={"name": "x"},
         headers=auth_headers,
@@ -88,20 +103,23 @@ def test_update_unknown_category_returns_404(client, auth_headers):
     assert response.status_code == 404
 
 
-def test_delete_category_soft_deletes(client, auth_headers, db_session, user):
+async def test_delete_category_soft_deletes(client, auth_headers, db_session, user):
     category = Category(user_id=user.id, name="Транспорт")
     db_session.add(category)
-    db_session.flush()
+    await db_session.flush()
 
-    response = client.delete(f"/api/v1/categories/{category.id}", headers=auth_headers)
+    category_id = category.id
+    response = await client.delete(f"/api/v1/categories/{category_id}", headers=auth_headers)
     assert response.status_code == 204
 
     db_session.expire_all()
-    refreshed = db_session.get(Category, category.id)
+    refreshed = await db_session.get(Category, category_id)
     assert refreshed.deleted_at is not None
 
 
-def test_delete_system_category_is_forbidden(client, auth_headers, default_category):
-    response = client.delete(f"/api/v1/categories/{default_category.id}", headers=auth_headers)
+async def test_delete_system_category_is_forbidden(client, auth_headers, default_category):
+    response = await client.delete(
+        f"/api/v1/categories/{default_category.id}", headers=auth_headers
+    )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "category_is_system"

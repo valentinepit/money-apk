@@ -1,21 +1,31 @@
 import uuid
+from collections.abc import AsyncGenerator
 
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 
-from app.database import get_db
 from app.errors import unauthorized
+from app.exceptions import NotFoundError
 from app.models import User
 from app.security import decode_access_token
+from app.services import auth_service
+from app.unit_of_work import AbstractUnitOfWork, SqlAlchemyUnitOfWork
 
 # tokenUrl указывает на реальный эндпоинт логина — используется только для описания схемы в OpenAPI.
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
-def get_current_user(
+async def get_uow() -> AsyncGenerator[AbstractUnitOfWork, None]:
+    """UnitOfWork на весь запрос: один и тот же экземпляр возвращается всем
+    Depends() в рамках одного запроса (FastAPI кеширует зависимости per-request)."""
+    uow = SqlAlchemyUnitOfWork()
+    async with uow:
+        yield uow
+
+
+async def get_current_user(
     token: str | None = Depends(_oauth2_scheme),
-    db: Session = Depends(get_db),
+    uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> User:
     if not token:
         raise unauthorized("Отсутствует токен авторизации")
@@ -30,8 +40,7 @@ def get_current_user(
     except (ValueError, TypeError) as exc:
         raise unauthorized("Невалидный токен") from exc
 
-    user = db.get(User, user_id)
-    if user is None:
-        raise unauthorized("Пользователь не найден")
-
-    return user
+    try:
+        return await auth_service.get_user_by_id(uow, user_id)
+    except NotFoundError as exc:
+        raise unauthorized("Пользователь не найден") from exc

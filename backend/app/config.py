@@ -1,6 +1,9 @@
+import re
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DRIVER_RE = re.compile(r"^postgresql(\+\w+)?://")
 
 
 class Settings(BaseSettings):
@@ -13,6 +16,15 @@ class Settings(BaseSettings):
 
     admin_email: str = "admin@example.com"
     admin_password: str = "change-me"
+
+    @property
+    def async_database_url(self) -> str:
+        """URL для асинхронного движка приложения (asyncpg).
+
+        database_url — синхронный (psycopg2), используется только Alembic'ом
+        для миграций (см. alembic/env.py). Само приложение работает асинхронно.
+        """
+        return _DRIVER_RE.sub("postgresql+asyncpg://", self.database_url)
 
 
 @lru_cache
