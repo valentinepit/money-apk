@@ -79,3 +79,51 @@ class PaginationMeta(BaseModel):
     page: int
     per_page: int
     total_pages: int
+
+
+class ReportRowOut(BaseModel):
+    category_id: uuid.UUID
+    category_name: str
+    total: float
+    count: int
+
+
+class ReportMeta(BaseModel):
+    date_from: date
+    date_to: date
+    total_overall: float
+
+
+# --- Конверты ответов (см. docs/api/api-contract.md: {"data": ...} / {"data": [...], "meta": {...}}) ---
+# Явные обёртки под response_model= в роутерах — чтобы FastAPI валидировал
+# и документировал реальную форму ответа, а не просто "dict".
+
+
+class TokenDataResponse(BaseModel):
+    data: TokenResponse
+
+
+class UserDataResponse(BaseModel):
+    data: UserOut
+
+
+class CategoryDataResponse(BaseModel):
+    data: CategoryOut
+
+
+class CategoryListResponse(BaseModel):
+    data: list[CategoryOut]
+
+
+class TransactionDataResponse(BaseModel):
+    data: TransactionOut
+
+
+class TransactionListResponse(BaseModel):
+    data: list[TransactionOut]
+    meta: PaginationMeta
+
+
+class ReportListResponse(BaseModel):
+    data: list[ReportRowOut]
+    meta: ReportMeta

@@ -6,64 +6,64 @@ from app.deps import get_current_user, get_uow
 from app.errors import conflict, not_found
 from app.exceptions import CategoryIsSystemError, NotFoundError
 from app.models import User
-from app.schemas import CategoryCreate, CategoryOut, CategoryUpdate
+from app.schemas import CategoryCreate, CategoryDataResponse, CategoryListResponse, CategoryOut, CategoryUpdate
 from app.services import category_service
 from app.unit_of_work import AbstractUnitOfWork
 
 router = APIRouter(prefix="/api/v1/categories", tags=["categories"])
 
 
-@router.get("")
+@router.get("", response_model=CategoryListResponse)
 async def list_categories(
     include_deleted: bool = False,
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
-) -> dict:
+) -> CategoryListResponse:
     categories = await category_service.list_categories(uow, current_user.id, include_deleted)
-    return {"data": [CategoryOut.model_validate(c).model_dump(mode="json") for c in categories]}
+    return CategoryListResponse(data=[CategoryOut.model_validate(c) for c in categories])
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=CategoryDataResponse)
 async def create_category(
     payload: CategoryCreate,
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
-) -> dict:
+) -> CategoryDataResponse:
     category = await category_service.create_category(
         uow, current_user.id, name=payload.name, icon=payload.icon, color=payload.color
     )
-    return {"data": CategoryOut.model_validate(category).model_dump(mode="json")}
+    return CategoryDataResponse(data=CategoryOut.model_validate(category))
 
 
-@router.get("/{category_id}")
+@router.get("/{category_id}", response_model=CategoryDataResponse)
 async def get_category(
     category_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
-) -> dict:
+) -> CategoryDataResponse:
     try:
         category = await category_service.get_category(uow, current_user.id, category_id)
     except NotFoundError as exc:
         raise not_found(exc.message) from exc
-    return {"data": CategoryOut.model_validate(category).model_dump(mode="json")}
+    return CategoryDataResponse(data=CategoryOut.model_validate(category))
 
 
-@router.patch("/{category_id}")
+@router.patch("/{category_id}", response_model=CategoryDataResponse)
 async def update_category(
     category_id: uuid.UUID,
     payload: CategoryUpdate,
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
-) -> dict:
+) -> CategoryDataResponse:
     updates = payload.model_dump(exclude_unset=True)
     try:
         category = await category_service.update_category(uow, current_user.id, category_id, updates)
     except NotFoundError as exc:
         raise not_found(exc.message) from exc
-    return {"data": CategoryOut.model_validate(category).model_dump(mode="json")}
+    return CategoryDataResponse(data=CategoryOut.model_validate(category))
 
 
-@router.delete("/{category_id}", status_code=204)
+@router.delete("/{category_id}", status_code=204, response_model=None)
 async def delete_category(
     category_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
