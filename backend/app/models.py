@@ -64,10 +64,12 @@ class BaseModel(Base):
         if not relations:
             return result
         related_obj = getattr(self, relations)
-        if related_obj is not None:
-            if isinstance(related_obj, list):
-                result[relations] = [x.to_dict() for x in getattr(self, relations)]
-                return result
+        if related_obj is None:
+            result[relations] = None
+            return result
+        if isinstance(related_obj, list):
+            result[relations] = [x.to_dict() for x in related_obj]
+            return result
         result[relations] = related_obj.to_dict()
         return result
 
