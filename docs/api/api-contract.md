@@ -71,7 +71,9 @@ Query (`Query(...)`, обе обязательные): `date_from`, `date_to`.
 | GET | /api/v1/categorization-rules | список правил, фильтр `?source=user_rule\|system_dictionary` |
 | DELETE | /api/v1/categorization-rules/:id | удалить личное правило |
 
-- `DELETE` правила с `source=system_dictionary` → 403 (общий словарь не редактируется через API в MVP, только миграцией/сидом).
+- Видимость (`GET`, а также владение для `DELETE`) скоуплена так же, как у категорий: своё личное правило (`user_id = текущий пользователь`) либо общее системное (`user_id IS NULL`). Правило другого пользователя — как будто не существует (404).
+- `DELETE` правила с `source=system_dictionary` → **409** `rule_is_system` (общий словарь не редактируется через API в MVP, только миграцией/сидом) — симметрично `category_is_system` у категорий, а не 403 (это не про права доступа, а про то, что ресурс в принципе не поддерживает такую операцию).
+- Реализовано: `GET`/`DELETE /api/v1/categorization-rules[...]` — готово (фаза 3, коммит `d961d02` в `feature/core-endpoints`).
 
 ## Import
 
