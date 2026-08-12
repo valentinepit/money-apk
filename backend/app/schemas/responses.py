@@ -68,11 +68,6 @@ class ReportMeta(BaseModel):
     total_overall: float
 
 
-# --- Конверты ответов (см. docs/api/api-contract.md: {"data": ...} / {"data": [...], "meta": {...}}) ---
-# Явные обёртки под response_model= в роутерах — чтобы FastAPI валидировал
-# и документировал реальную форму ответа, а не просто "dict".
-
-
 class TokenDataResponse(BaseModel):
     data: TokenResponse
 
