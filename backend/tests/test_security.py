@@ -26,7 +26,12 @@ def test_create_and_decode_access_token():
 
 def test_decode_rejects_tampered_token():
     token = create_access_token(subject="user-123")
-    tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+    header, payload, signature = token.split(".")
+    # Портим сам payload (не последний символ подписи — там могут быть
+    # незначащие биты base64url, из-за которых подмена иногда не меняет
+    # декодированные байты подписи и тест был бы флейки).
+    tampered_payload = ("a" if payload[0] != "a" else "b") + payload[1:]
+    tampered = f"{header}.{tampered_payload}.{signature}"
 
     with pytest.raises(Exception):
         decode_access_token(tampered)
