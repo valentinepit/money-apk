@@ -13,6 +13,8 @@ from app.schemas.requests import (
     TransactionUpdate,
 )
 from app.schemas.responses import (
+    CategorizationRuleListResponse,
+    CategorizationRuleOut,
     CategoryDataResponse,
     CategoryListResponse,
     CategoryOut,
@@ -35,6 +37,8 @@ __all__ = [
     "LoginRequest",
     "TransactionCreate",
     "TransactionUpdate",
+    "CategorizationRuleListResponse",
+    "CategorizationRuleOut",
     "CategoryDataResponse",
     "CategoryListResponse",
     "CategoryOut",

@@ -38,3 +38,8 @@ class ConflictError(DomainError):
 class CategoryIsSystemError(ConflictError):
     def __init__(self, message: str = "Системную категорию нельзя удалить") -> None:
         super().__init__("category_is_system", message)
+
+
+class RuleIsSystemError(ConflictError):
+    def __init__(self, message: str = "Системное правило нельзя удалить") -> None:
+        super().__init__("rule_is_system", message)

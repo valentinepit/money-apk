@@ -68,6 +68,15 @@ class ReportMeta(BaseModel):
     total_overall: float
 
 
+class CategorizationRuleOut(BaseModel):
+    id: uuid.UUID
+    merchant_pattern: str
+    category_id: uuid.UUID
+    source: str
+
+    model_config = {"from_attributes": True}
+
+
 class TokenDataResponse(BaseModel):
     data: TokenResponse
 
@@ -96,3 +105,7 @@ class TransactionListResponse(BaseModel):
 class ReportListResponse(BaseModel):
     data: list[ReportRowOut]
     meta: ReportMeta
+
+
+class CategorizationRuleListResponse(BaseModel):
+    data: list[CategorizationRuleOut]
