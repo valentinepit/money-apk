@@ -1,0 +1,29 @@
+# Локальная разработка. Продовый деплой на VPS — см. docker-compose.prod.yml.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: money_apk
+      POSTGRES_PASSWORD: money_apk_dev
+      POSTGRES_DB: money_apk_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg2://money_apk:money_apk_dev@db/money_apk_dev
+      JWT_SECRET_KEY: dev-secret-change-me
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: change-me
+    ports:
+      - "8000:8000"
+
+volumes:
+  db_data:
