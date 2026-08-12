@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Python (backend)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.env
+.env.*
+
+# Android / Gradle
+*.apk
+*.aab
+.gradle/
+build/
+local.properties
+captures/
+.cxx/
+*.jks
+*.keystore
+
+# Misc
+*.log
+_to_delete/
