@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.deps import get_current_user, get_uow
 from app.models import User
-from app.schemas import ReportListResponse, ReportMeta, ReportRowOut
+from app.schemas.responses import ReportListResponse, ReportMeta, ReportRowOut
 from app.services import report_service
 from app.unit_of_work import AbstractUnitOfWork
 

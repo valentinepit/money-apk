@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Query, Response
 
@@ -6,7 +7,8 @@ from app.deps import get_current_user, get_uow
 from app.errors import conflict, not_found
 from app.exceptions import CategoryIsSystemError, NotFoundError
 from app.models import User
-from app.schemas import CategoryDataResponse, CategoryListResponse, CategoryOut
+from app.schemas.requests import CategoryCreate, CategoryUpdate
+from app.schemas.responses import CategoryDataResponse, CategoryListResponse, CategoryOut
 from app.services import category_service
 from app.unit_of_work import AbstractUnitOfWork
 
@@ -25,13 +27,13 @@ async def list_categories(
 
 @router.post("", status_code=201, response_model=CategoryDataResponse)
 async def create_category(
-    name: str = Form(...),
-    icon: str | None = Form(None),
-    color: str | None = Form(None),
+    payload: Annotated[CategoryCreate, Form()],
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> CategoryDataResponse:
-    category = await category_service.create_category(uow, current_user.id, name=name, icon=icon, color=color)
+    category = await category_service.create_category(
+        uow, current_user.id, name=payload.name, icon=payload.icon, color=payload.color
+    )
     return CategoryDataResponse(data=CategoryOut.model_validate(category))
 
 
@@ -51,17 +53,13 @@ async def get_category(
 @router.patch("/{category_id}", response_model=CategoryDataResponse)
 async def update_category(
     category_id: uuid.UUID,
-    name: str | None = Form(None),
-    icon: str | None = Form(None),
-    color: str | None = Form(None),
+    payload: Annotated[CategoryUpdate, Form()],
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> CategoryDataResponse:
-    # Form-поля не различают "поле не передано" и "поле передано как null" —
-    # трактуем непереданное (None) как "не менять" (см. правило проекта:
-    # POST/PATCH — через Form, а не Pydantic-body с exclude_unset).
-    updates = {"name": name, "icon": icon, "color": color}
-    updates = {field: value for field, value in updates.items() if value is not None}
+    # Form-модель не различает "поле не передано" и "поле передано как null" —
+    # непереданное (None) трактуем как "не менять" (см. app/schemas/requests.py).
+    updates = payload.model_dump(exclude_none=True)
     try:
         category = await category_service.update_category(uow, current_user.id, category_id, updates)
     except NotFoundError as exc:

@@ -1,6 +1,7 @@
 import math
 import uuid
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Query, Response
 
@@ -9,7 +10,8 @@ from app.errors import not_found
 from app.exceptions import NotFoundError
 from app.models import TransactionSource, User
 from app.repositories.transactions import TransactionFilters
-from app.schemas import (
+from app.schemas.requests import TransactionCreate, TransactionUpdate
+from app.schemas.responses import (
     PaginationMeta,
     TransactionDataResponse,
     TransactionListResponse,
@@ -53,11 +55,7 @@ async def list_transactions(
 
 @router.post("", status_code=201, response_model=TransactionDataResponse)
 async def create_transaction(
-    amount: float = Form(...),
-    category_id: uuid.UUID | None = Form(None),
-    merchant_raw: str | None = Form(None),
-    note: str | None = Form(None),
-    transaction_date: date = Form(...),
+    payload: Annotated[TransactionCreate, Form()],
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> TransactionDataResponse:
@@ -65,11 +63,11 @@ async def create_transaction(
         transaction = await transaction_service.create_transaction(
             uow,
             current_user.id,
-            amount=amount,
-            category_id=category_id,
-            merchant_raw=merchant_raw,
-            note=note,
-            transaction_date=transaction_date,
+            amount=payload.amount,
+            category_id=payload.category_id,
+            merchant_raw=payload.merchant_raw,
+            note=payload.note,
+            transaction_date=payload.transaction_date,
         )
     except NotFoundError as exc:
         raise not_found(exc.message) from exc
@@ -92,25 +90,13 @@ async def get_transaction(
 @router.patch("/{transaction_id}", response_model=TransactionDataResponse)
 async def update_transaction(
     transaction_id: uuid.UUID,
-    amount: float | None = Form(None),
-    category_id: uuid.UUID | None = Form(None),
-    merchant_raw: str | None = Form(None),
-    note: str | None = Form(None),
-    transaction_date: date | None = Form(None),
+    payload: Annotated[TransactionUpdate, Form()],
     current_user: User = Depends(get_current_user),
     uow: AbstractUnitOfWork = Depends(get_uow),
 ) -> TransactionDataResponse:
-    # Form-поля не различают "поле не передано" и "поле передано как null" —
-    # непереданное (None) трактуем как "не менять" (см. правило проекта:
-    # POST/PATCH — через Form, а не Pydantic-body с exclude_unset).
-    updates = {
-        "amount": amount,
-        "category_id": category_id,
-        "merchant_raw": merchant_raw,
-        "note": note,
-        "transaction_date": transaction_date,
-    }
-    updates = {field: value for field, value in updates.items() if value is not None}
+    # Form-модель не различает "поле не передано" и "поле передано как null" —
+    # непереданное (None) трактуем как "не менять" (см. app/schemas/requests.py).
+    updates = payload.model_dump(exclude_none=True)
     try:
         transaction = await transaction_service.update_transaction(
             uow, current_user.id, transaction_id, updates
