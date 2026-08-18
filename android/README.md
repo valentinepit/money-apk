@@ -10,7 +10,7 @@
 - Gradle 9.5.0 (будет предложен автоматически, см. ниже)
 - Kotlin 2.4.0
 - Jetpack Compose BOM 2026.08.00
-- compileSdk / targetSdk = 36, minSdk = 26
+- compileSdk / targetSdk = 37, minSdk = 26 (Compose 1.12.0 требует compileSdk 37+; см. "Если что-то не собралось" ниже — было 36, поднято после AAR-metadata-ошибки)
 
 ## Как открыть проект в Android Studio
 
