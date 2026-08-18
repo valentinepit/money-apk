@@ -82,6 +82,12 @@ async def test_create_category(client, auth_headers):
     assert body["is_system"] is False
 
 
+async def test_create_category_with_empty_name_returns_422(client, auth_headers):
+    response = await client.post("/api/v1/categories", data={"name": ""}, headers=auth_headers)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
 async def test_update_category(client, auth_headers, db_session, user):
     category = Category(user_id=user.id, name="Транспорт")
     db_session.add(category)
@@ -92,6 +98,18 @@ async def test_update_category(client, auth_headers, db_session, user):
     )
     assert response.status_code == 200
     assert response.json()["data"]["name"] == "Транспорт и авто"
+
+
+async def test_update_category_with_empty_name_returns_422(client, auth_headers, db_session, user):
+    category = Category(user_id=user.id, name="Транспорт")
+    db_session.add(category)
+    await db_session.flush()
+
+    response = await client.patch(
+        f"/api/v1/categories/{category.id}", data={"name": ""}, headers=auth_headers
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
 
 
 async def test_update_unknown_category_returns_404(client, auth_headers):
