@@ -1,15 +1,11 @@
 """
-Парсер CSV-выписки по карте (образец прислан пользователем, файл обычно
-называется kontaparskats.csv — "выписка по счёту" на латышском).
+Парсер CSV-выписки по карте SEB (Латвия) — образец прислан пользователем,
+файл обычно называется kontaparskats.csv, "выписка по счёту" на латышском.
 
 Формат: semicolon-CSV, UTF-8 с BOM, каждое поле в кавычках. Первая строка
 файла — заголовок отчёта ("Kartes (...) darījumu pārskats...", не строка
 таблицы), реальные названия колонок — во второй строке. Суммы через точку,
 даты DD.MM.YYYY.
-
-Какой конкретно банк/сервис выпускает такую выписку — уточняется у
-пользователя отдельно (для документации/имени парсера); на саму логику
-разбора это не влияет — сигнатура формата определяется по названиям колонок.
 """
 
 from __future__ import annotations
@@ -28,8 +24,8 @@ _DEBIT = "D"
 _SUPPORTED_CURRENCY = "EUR"  # money-apk считает только в EUR (см. claude/plan.md)
 
 
-class LvCardTransactionsCsvParser(BankStatementParser):
-    name = "lv_card_transactions_csv"
+class SebLvCardTransactionsCsvParser(BankStatementParser):
+    name = "seb_lv_card_transactions_csv"
 
     @classmethod
     def can_parse(cls, raw_bytes: bytes, file_name: str) -> bool:
