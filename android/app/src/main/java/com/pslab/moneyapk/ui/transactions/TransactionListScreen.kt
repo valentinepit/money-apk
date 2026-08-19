@@ -112,7 +112,7 @@ fun TransactionListScreen(
                     } else {
                         LazyColumn(
                             modifier = Modifier
-                                .fillMaXSize()
+                                .fillMaxSize()
                                 .padding(horizontal = 16.dp)
                         ) {
                             items(uiState.transactions) { transaction ->
