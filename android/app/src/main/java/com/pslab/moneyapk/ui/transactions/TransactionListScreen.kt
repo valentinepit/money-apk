@@ -38,6 +38,7 @@ import java.util.Locale
 fun TransactionListScreen(
     onAddTransaction: () -> Unit,
     onOpenReport: () -> Unit,
+    onOpenCategories: () -> Unit,
     onLogout: () -> Unit,
     viewModel: TransactionListViewModel = viewModel()
 ) {
@@ -69,6 +70,9 @@ fun TransactionListScreen(
                 actions = {
                     TextButton(onClick = onOpenReport) {
                         Text("Отчёт")
+                    }
+                    TextButton(onClick = onOpenCategories) {
+                        Text("Категории")
                     }
                     TextButton(onClick = { viewModel.load() }) {
                         Text("Обновить")

@@ -15,3 +15,8 @@ data class CategoryOut(
 data class CategoryListResponse(
     val data: List<CategoryOut>
 )
+
+/** Конверт одной категории: `POST /api/v1/categories` -> `{"data": {...}}`. */
+data class CategoryDataResponse(
+    val data: CategoryOut
+)

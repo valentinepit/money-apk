@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.pslab.moneyapk.data.TokenStore
+import com.pslab.moneyapk.ui.categories.CategoryListScreen
 import com.pslab.moneyapk.ui.login.LoginScreen
 import com.pslab.moneyapk.ui.reports.CategoryReportScreen
 import com.pslab.moneyapk.ui.theme.MoneyApkTheme
@@ -22,6 +23,7 @@ import com.pslab.moneyapk.ui.transactions.TransactionListScreen
 
 /**
  * Шаг 3 фазы 4: список транзакций + ручной ввод. Шаг 4: отчёт по категориям.
+ * Следующий шаг: экран управления категориями (список + добавление).
  *
  * Экранов стало больше двух, поэтому вместо ручного if/else (как было в
  * шаге 2 для логин/приветствие) используется Navigation Compose — `NavHost`
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
                             TransactionListScreen(
                                 onAddTransaction = { navController.navigate(Routes.ADD_TRANSACTION) },
                                 onOpenReport = { navController.navigate(Routes.CATEGORY_REPORT) },
+                                onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
                                 onLogout = {
                                     tokenStore.clearToken()
                                     navController.navigate(Routes.LOGIN) {
@@ -87,6 +90,11 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                        composable(Routes.CATEGORIES) {
+                            CategoryListScreen(
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                     }
                 }
             }
@@ -99,4 +107,5 @@ private object Routes {
     const val TRANSACTIONS = "transactions"
     const val ADD_TRANSACTION = "addTransaction"
     const val CATEGORY_REPORT = "categoryReport"
+    const val CATEGORIES = "categories"
 }
