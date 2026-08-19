@@ -12,11 +12,15 @@ from __future__ import annotations
 from app.exceptions import UnknownStatementFormatError
 from app.parsers.base import BankStatementParser
 from app.parsers.seb_lv_card_transactions_csv import SebLvCardTransactionsCsvParser
+from app.parsers.luminor_csv import LuminorCsvParser
 
 # Добавлять новые парсеры сюда по мере получения образцов выписок других
 # банков (см. claude/plan.md, фаза 5). Порядок имеет значение только если
 # сигнатуры двух парсеров вдруг пересекутся — выигрывает первый подошедший.
-_PARSER_CLASSES: tuple[type[BankStatementParser], ...] = (SebLvCardTransactionsCsvParser,)
+_PARSER_CLASSES: tuple[type[BankStatementParser], ...] = (
+    SebLvCardTransactionsCsvParser,
+    LuminorCsvParser,
+)
 
 
 def get_parser_for(raw_bytes: bytes, file_name: str) -> BankStatementParser:
