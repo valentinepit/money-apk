@@ -140,7 +140,7 @@ fun CategoryReportScreen(
             initialIso = viewModel.dateFrom,
             onDismiss = { editingDateFrom = false },
             onConfirm = { iso ->
-                viewModel.setDateFrom(iso)
+                viewModel.onDateFromChanged(iso)
                 editingDateFrom = false
             }
         )
@@ -150,7 +150,7 @@ fun CategoryReportScreen(
             initialIso = viewModel.dateTo,
             onDismiss = { editingDateTo = false },
             onConfirm = { iso ->
-                viewModel.setDateTo(iso)
+                viewModel.onDateToChanged(iso)
                 editingDateTo = false
             }
         )

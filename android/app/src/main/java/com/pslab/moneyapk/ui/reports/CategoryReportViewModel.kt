@@ -28,6 +28,13 @@ class CategoryReportViewModel(application: Application) : AndroidViewModel(appli
 
     private val isoFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
+    // "private set" у var-свойства с делегатом mutableStateOf заставляет Kotlin
+    // сгенерировать в байткоде JVM-метод setDateFrom(String)/setDateTo(String)
+    // (обычное java-style имя сеттера для свойства dateFrom/dateTo) — поэтому
+    // ниже методы для изменения этих значений называются иначе
+    // (onDateFromChanged/onDateToChanged), а не setDateFrom/setDateTo: два
+    // метода с одинаковым именем и параметрами на JVM конфликтуют
+    // ("Platform declaration clash"), даже если Kotlin не считает это дублем.
     var dateFrom by mutableStateOf(LocalDate.now().withDayOfMonth(1).format(isoFormatter))
         private set
     var dateTo by mutableStateOf(LocalDate.now().format(isoFormatter))
@@ -40,12 +47,12 @@ class CategoryReportViewModel(application: Application) : AndroidViewModel(appli
         load()
     }
 
-    fun setDateFrom(value: String) {
+    fun onDateFromChanged(value: String) {
         dateFrom = value
         load()
     }
 
-    fun setDateTo(value: String) {
+    fun onDateToChanged(value: String) {
         dateTo = value
         load()
     }
