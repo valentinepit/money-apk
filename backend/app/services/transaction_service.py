@@ -70,9 +70,15 @@ async def get_transaction(uow: AbstractUnitOfWork, user_id: uuid.UUID, transacti
     return transaction
 
 
-async def _upsert_user_rule(
+async def upsert_user_rule(
     uow: AbstractUnitOfWork, user_id: uuid.UUID, merchant_normalized: str, category_id: uuid.UUID
 ) -> None:
+    """Создаёт/обновляет личное правило категоризации (самообучение).
+
+    Публичная функция — используется и здесь (смена категории транзакции
+    через PATCH), и в app/services/import_service.py (подтверждение импорта
+    с изменённой категорией), поэтому не префиксована подчёркиванием.
+    """
     if not merchant_normalized:
         return
 
@@ -106,7 +112,7 @@ async def update_transaction(
         transaction.category_id = updates["category_id"]
 
     if category_changed:
-        await _upsert_user_rule(uow, user_id, transaction.merchant_normalized, transaction.category_id)
+        await upsert_user_rule(uow, user_id, transaction.merchant_normalized, transaction.category_id)
 
     await uow.commit()
     return transaction

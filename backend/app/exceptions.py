@@ -57,3 +57,20 @@ class StatementParseError(DomainError):
 
     def __init__(self, message: str = "Не удалось разобрать файл выписки") -> None:
         super().__init__(message)
+
+
+class SessionAlreadyConfirmedError(ConflictError):
+    """confirm/delete на уже подтверждённой импорт-сессии (см. api-contract.md)."""
+
+    def __init__(self, message: str = "Импорт-сессия уже подтверждена") -> None:
+        super().__init__("session_already_confirmed", message)
+
+
+class ImportSessionNotConfirmableError(ConflictError):
+    """confirm на сессии без превью (status=failed/uploaded) — решение сверх контракта,
+
+    чтобы не пытаться создавать транзакции из отсутствующего parsed_preview.
+    """
+
+    def __init__(self, message: str = "Импорт-сессию нельзя подтвердить в текущем статусе") -> None:
+        super().__init__("import_session_not_confirmable", message)

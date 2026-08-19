@@ -29,6 +29,15 @@ class AbstractCategorizationRuleRepository(ABC):
         ...
 
     @abstractmethod
+    async def get_matching_rule(
+        self, user_id: uuid.UUID, merchant_pattern: str
+    ) -> CategorizationRule | None:
+        """Правило для автокатегоризации при импорте: точное совпадение по
+        merchant_pattern, личное правило пользователя приоритетнее системного
+        словаря (см. docs/plan.md, "Автокатегоризация...")."""
+        ...
+
+    @abstractmethod
     async def delete(self, rule: CategorizationRule) -> None: ...
 
 
@@ -68,6 +77,22 @@ class SqlAlchemyCategorizationRuleRepository(AbstractCategorizationRuleRepositor
         )
         result = await self.session.scalars(stmt)
         return result.one_or_none()
+
+    async def get_matching_rule(
+        self, user_id: uuid.UUID, merchant_pattern: str
+    ) -> CategorizationRule | None:
+        stmt = (
+            select(CategorizationRule)
+            .where(
+                CategorizationRule.merchant_pattern == merchant_pattern,
+                (CategorizationRule.user_id == user_id) | (CategorizationRule.user_id.is_(None)),
+            )
+            # user_id IS NULL -> False(=0) для личного правила, True(=1) для
+            # системного — личное правило пользователя сортируется первым.
+            .order_by(CategorizationRule.user_id.is_(None))
+        )
+        result = await self.session.scalars(stmt)
+        return result.first()
 
     async def delete(self, rule: CategorizationRule) -> None:
         await self.session.delete(rule)

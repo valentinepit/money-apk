@@ -40,3 +40,22 @@ class TransactionUpdate(BaseModel):
     merchant_raw: str | None = None
     note: str | None = None
     transaction_date: date | None = None
+
+
+class ImportSessionConfirmLine(BaseModel):
+    line_no: int
+    # None = оставить category_id, предложенный на этапе парсинга (suggested_category_id).
+    category_id: uuid.UUID | None = None
+    exclude: bool = False
+
+
+class ImportSessionConfirmRequest(BaseModel):
+    """Тело POST /api/v1/import-sessions/:id/confirm.
+
+    Зафиксированное исключение из правила "POST — через Form" (см.
+    api-contract.md, "API-конвенции"): это список объектов с правками
+    пользователя по строкам импорта, который не выражается плоскими
+    form-полями — тело остаётся application/json.
+    """
+
+    transactions: list[ImportSessionConfirmLine]
