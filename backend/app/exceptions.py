@@ -43,3 +43,17 @@ class CategoryIsSystemError(ConflictError):
 class RuleIsSystemError(ConflictError):
     def __init__(self, message: str = "Системное правило нельзя удалить") -> None:
         super().__init__("rule_is_system", message)
+
+
+class UnknownStatementFormatError(DomainError):
+    """Ни один из зарегистрированных парсеров (app/parsers/) не подошёл к файлу."""
+
+    def __init__(self, message: str = "Формат файла выписки не распознан") -> None:
+        super().__init__(message)
+
+
+class StatementParseError(DomainError):
+    """Формат файла распознан (can_parse=True), но разобрать содержимое не удалось."""
+
+    def __init__(self, message: str = "Не удалось разобрать файл выписки") -> None:
+        super().__init__(message)
