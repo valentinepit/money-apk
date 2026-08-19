@@ -9,7 +9,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 /**
  * Единая точка создания Retrofit — весь остальной код приложения ходит в
- * сеть только через `RetrofitClient.authApi`/`transactionApi`/`categoryApi`,
+ * сеть только через `RetrofitClient.authApi`/`transactionApi`/`categoryApi`/`reportApi`,
  * не создавая свои экземпляры Retrofit.
  *
  * `object` в Kotlin — это синглтон: он создаётся один раз при первом
@@ -57,4 +57,5 @@ object RetrofitClient {
     val authApi: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val transactionApi: TransactionApi by lazy { retrofit.create(TransactionApi::class.java) }
     val categoryApi: CategoryApi by lazy { retrofit.create(CategoryApi::class.java) }
+    val reportApi: ReportApi by lazy { retrofit.create(ReportApi::class.java) }
 }

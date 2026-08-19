@@ -15,12 +15,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.pslab.moneyapk.data.TokenStore
 import com.pslab.moneyapk.ui.login.LoginScreen
+import com.pslab.moneyapk.ui.reports.CategoryReportScreen
 import com.pslab.moneyapk.ui.theme.MoneyApkTheme
 import com.pslab.moneyapk.ui.transactions.ManualEntryScreen
 import com.pslab.moneyapk.ui.transactions.TransactionListScreen
 
 /**
- * Шаг 3 фазы 4: список транзакций + ручной ввод.
+ * Шаг 3 фазы 4: список транзакций + ручной ввод. Шаг 4: отчёт по категориям.
  *
  * Экранов стало больше двух, поэтому вместо ручного if/else (как было в
  * шаге 2 для логин/приветствие) используется Navigation Compose — `NavHost`
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
                         composable(Routes.TRANSACTIONS) {
                             TransactionListScreen(
                                 onAddTransaction = { navController.navigate(Routes.ADD_TRANSACTION) },
+                                onOpenReport = { navController.navigate(Routes.CATEGORY_REPORT) },
                                 onLogout = {
                                     tokenStore.clearToken()
                                     navController.navigate(Routes.LOGIN) {
@@ -80,6 +82,11 @@ class MainActivity : ComponentActivity() {
                                 onDone = { navController.popBackStack() }
                             )
                         }
+                        composable(Routes.CATEGORY_REPORT) {
+                            CategoryReportScreen(
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                     }
                 }
             }
@@ -91,4 +98,5 @@ private object Routes {
     const val LOGIN = "login"
     const val TRANSACTIONS = "transactions"
     const val ADD_TRANSACTION = "addTransaction"
+    const val CATEGORY_REPORT = "categoryReport"
 }

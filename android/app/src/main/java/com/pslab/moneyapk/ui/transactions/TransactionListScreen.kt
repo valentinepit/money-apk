@@ -37,6 +37,7 @@ import java.util.Locale
 @Composable
 fun TransactionListScreen(
     onAddTransaction: () -> Unit,
+    onOpenReport: () -> Unit,
     onLogout: () -> Unit,
     viewModel: TransactionListViewModel = viewModel()
 ) {
@@ -66,6 +67,9 @@ fun TransactionListScreen(
             TopAppBar(
                 title = { Text("Транзакции") },
                 actions = {
+                    TextButton(onClick = onOpenReport) {
+                        Text("Отчёт")
+                    }
                     TextButton(onClick = { viewModel.load() }) {
                         Text("Обновить")
                     }
