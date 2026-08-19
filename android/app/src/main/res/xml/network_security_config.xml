@@ -3,15 +3,15 @@
     Начиная с Android 9 (API 28) обычный HTTP (без TLS) заблокирован по умолчанию —
     это правильно для боевого сервера, но мешает разработке: пока бэкенд не задеплоен
     на VPS с HTTPS, приложение на этапе разработки ходит на localhost компьютера
-    через эмулятор по адресу 10.0.2.2 (см. ApiConfig.kt) обычным HTTP.
+    по адресу 127.0.0.1 (см. ApiConfig.kt) обычным HTTP, через `adb reverse`.
 
     Здесь мы точечно разрешаем cleartext (нешифрованный) трафик только для этого
-    одного адреса — 10.0.2.2 — а не для всего приложения. Когда бэкенд переедет на
+    одного адреса — 127.0.0.1 — а не для всего приложения. Когда бэкенд переедет на
     реальный домен с HTTPS, этот файл можно будет удалить вместе со ссылкой на него
     в AndroidManifest.xml.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
     </domain-config>
 </network-security-config>
