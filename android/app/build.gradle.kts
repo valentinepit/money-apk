@@ -54,6 +54,9 @@ dependencies {
     // Шифрованное хранилище для JWT-токена (EncryptedSharedPreferences).
     implementation(libs.androidx.security.crypto)
 
+    // Навигация между экранами (шаг 3 фазы 4: список транзакций, ручной ввод).
+    implementation(libs.androidx.navigation.compose)
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

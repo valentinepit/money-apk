@@ -1,5 +1,7 @@
 package com.pslab.moneyapk.network
 
+import android.content.Context
+import com.pslab.moneyapk.data.TokenStore
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -7,31 +9,52 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 /**
  * Единая точка создания Retrofit — весь остальной код приложения ходит в
- * сеть только через `RetrofitClient.authApi` (а позже — и другие
- * `*Api`-интерфейсы), не создавая свои экземпляры Retrofit.
+ * сеть только через `RetrofitClient.authApi`/`transactionApi`/`categoryApi`,
+ * не создавая свои экземпляры Retrofit.
  *
  * `object` в Kotlin — это синглтон: он создаётся один раз при первом
  * обращении и живёт всё время работы приложения.
+ *
+ * Начиная с шага 3 фазы 4 клиенту нужен контекст (чтобы создать [TokenStore]
+ * для [AuthInterceptor] — тот сам подставляет сохранённый JWT-токен в каждый
+ * запрос). Поэтому появился явный [init] — его вызывает
+ * [com.pslab.moneyapk.MoneyApkApplication.onCreate] один раз при старте
+ * приложения, раньше любого обращения к `*Api`.
  */
 object RetrofitClient {
+
+    private lateinit var tokenStore: TokenStore
+
+    fun init(context: Context) {
+        tokenStore = TokenStore(context.applicationContext)
+    }
 
     // Логирует в Logcat (вкладка Logcat в Android Studio) каждый запрос и
     // ответ целиком — очень удобно при отладке, но НЕ для боевой сборки
     // (в теле ответа может быть токен). Уровень BODY нормален, пока
-    // приложение общается только с локальным dev-сервером на 10.0.2.2.
+    // приложение общается только с локальным dev-сервером.
+    // Добавлен ДО AuthInterceptor, поэтому логирует запрос без заголовка
+    // Authorization — токен не попадает в Logcat.
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
-        .build()
+    private val okHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .addInterceptor(AuthInterceptor(tokenStore))
+            .build()
+    }
 
-    private val retrofit = Retrofit.Builder()
-        .baseUrl(ApiConfig.BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+    private val retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(ApiConfig.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
 
-    val authApi: AuthApi = retrofit.create(AuthApi::class.java)
+    val authApi: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
+    val transactionApi: TransactionApi by lazy { retrofit.create(TransactionApi::class.java) }
+    val categoryApi: CategoryApi by lazy { retrofit.create(CategoryApi::class.java) }
 }
