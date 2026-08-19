@@ -17,9 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pslab.moneyapk.network.TransactionOut
 import java.util.Locale
@@ -37,6 +41,25 @@ fun TransactionListScreen(
     viewModel: TransactionListViewModel = viewModel()
 ) {
     val uiState = viewModel.uiState
+
+    // ViewModel живёт, пока жив маршрут "transactions" в навигационном стеке —
+    // при возврате с экрана добавления транзакции (popBackStack) это тот же
+    // самый экземпляр ViewModel, и его init{} повторно не вызывается. Поэтому
+    // подписываемся на жизненный цикл экрана и перезагружаем список каждый раз,
+    // когда экран снова становится видимым (ON_RESUME) — в том числе и при
+    // возвращении из формы добавления траты.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.load()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -89,7 +112,7 @@ fun TransactionListScreen(
                     } else {
                         LazyColumn(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaXSize()
                                 .padding(horizontal = 16.dp)
                         ) {
                             items(uiState.transactions) { transaction ->
