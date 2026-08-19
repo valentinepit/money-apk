@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +20,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -30,8 +36,9 @@ import java.util.Locale
 
 /**
  * Главный экран после логина (заменяет прежний WelcomeScreen из шага 2).
- * Кнопка "+" (FAB) ведёт на экран ручного ввода, "Выйти" — сбрасывает
- * токен и возвращает на экран логина (навигация — в MainActivity).
+ * Кнопка "+" (FAB) ведёт на экран ручного ввода. Остальные переходы —
+ * в меню "⋮" (Отчёт/Категории/Импорт/Выйти), чтобы шапка не разрасталась
+ * с каждым новым экраном — видимой кнопкой оставлена только "Обновить".
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,10 +46,12 @@ fun TransactionListScreen(
     onAddTransaction: () -> Unit,
     onOpenReport: () -> Unit,
     onOpenCategories: () -> Unit,
+    onOpenImport: () -> Unit,
     onLogout: () -> Unit,
     viewModel: TransactionListViewModel = viewModel()
 ) {
     val uiState = viewModel.uiState
+    var menuExpanded by remember { mutableStateOf(false) }
 
     // ViewModel живёт, пока жив маршрут "transactions" в навигационном стеке —
     // при возврате с экрана добавления транзакции (popBackStack) это тот же
@@ -68,17 +77,46 @@ fun TransactionListScreen(
             TopAppBar(
                 title = { Text("Транзакции") },
                 actions = {
-                    TextButton(onClick = onOpenReport) {
-                        Text("Отчёт")
-                    }
-                    TextButton(onClick = onOpenCategories) {
-                        Text("Категории")
-                    }
                     TextButton(onClick = { viewModel.load() }) {
                         Text("Обновить")
                     }
-                    TextButton(onClick = onLogout) {
-                        Text("Выйти")
+                    Box {
+                        TextButton(onClick = { menuExpanded = true }) {
+                            Text("⋮")
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Отчёт") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onOpenReport()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Категории") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onOpenCategories()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Импорт") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onOpenImport()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Выйти") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onLogout()
+                                }
+                            )
+                        }
                     }
                 }
             )
