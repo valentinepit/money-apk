@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Routes.IMPORT_UPLOAD) {
                             ImportUploadScreen(
+                                onBack = { navController.popBackStack() },
                                 onUploaded = { sessionId ->
                                     navController.navigate(Routes.importPreview(sessionId)) {
                                         // Экран выбора файла убираем из стека — после загрузки
