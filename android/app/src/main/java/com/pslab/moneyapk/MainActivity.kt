@@ -74,6 +74,9 @@ class MainActivity : ComponentActivity() {
                         composable(Routes.TRANSACTIONS) {
                             TransactionListScreen(
                                 onAddTransaction = { navController.navigate(Routes.ADD_TRANSACTION) },
+                                onEditTransaction = { transactionId ->
+                                    navController.navigate(Routes.editTransaction(transactionId))
+                                },
                                 onOpenReport = { navController.navigate(Routes.CATEGORY_REPORT) },
                                 onOpenCategories = { navController.navigate(Routes.CATEGORIES) },
                                 onOpenImport = { navController.navigate(Routes.IMPORT_UPLOAD) },
@@ -87,8 +90,22 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Routes.ADD_TRANSACTION) {
                             ManualEntryScreen(
+                                onBack = { navController.popBackStack() },
                                 onDone = { navController.popBackStack() }
                             )
+                        }
+                        composable(
+                            route = Routes.EDIT_TRANSACTION,
+                            arguments = listOf(navArgument("transactionId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val transactionId = backStackEntry.arguments?.getString("transactionId")
+                            if (transactionId != null) {
+                                ManualEntryScreen(
+                                    transactionId = transactionId,
+                                    onBack = { navController.popBackStack() },
+                                    onDone = { navController.popBackStack() }
+                                )
+                            }
                         }
                         composable(Routes.CATEGORY_REPORT) {
                             CategoryReportScreen(
@@ -141,10 +158,12 @@ private object Routes {
     const val LOGIN = "login"
     const val TRANSACTIONS = "transactions"
     const val ADD_TRANSACTION = "addTransaction"
+    const val EDIT_TRANSACTION = "editTransaction/{transactionId}"
     const val CATEGORY_REPORT = "categoryReport"
     const val CATEGORIES = "categories"
     const val IMPORT_UPLOAD = "importUpload"
     const val IMPORT_PREVIEW = "importPreview/{sessionId}"
 
     fun importPreview(sessionId: String) = "importPreview/$sessionId"
+    fun editTransaction(transactionId: String) = "editTransaction/$transactionId"
 }

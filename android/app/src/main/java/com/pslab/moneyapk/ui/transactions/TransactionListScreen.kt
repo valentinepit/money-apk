@@ -1,5 +1,6 @@
 package com.pslab.moneyapk.ui.transactions
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,11 +40,14 @@ import java.util.Locale
  * Кнопка "+" (FAB) ведёт на экран ручного ввода. Остальные переходы —
  * в меню "⋮" (Отчёт/Категории/Импорт/Выйти), чтобы шапка не разрасталась
  * с каждым новым экраном — видимой кнопкой оставлена только "Обновить".
+ * Тап по карточке транзакции открывает её на редактирование (та же форма,
+ * что и для новой траты, см. ManualEntryScreen).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionListScreen(
     onAddTransaction: () -> Unit,
+    onEditTransaction: (transactionId: String) -> Unit,
     onOpenReport: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenImport: () -> Unit,
@@ -165,7 +169,8 @@ fun TransactionListScreen(
                                 TransactionRow(
                                     transaction = transaction,
                                     categoryName = uiState.categoriesById[transaction.categoryId]?.name
-                                        ?: "Другое"
+                                        ?: "Другое",
+                                    onClick = { onEditTransaction(transaction.id) }
                                 )
                             }
                         }
@@ -177,11 +182,12 @@ fun TransactionListScreen(
 }
 
 @Composable
-private fun TransactionRow(transaction: TransactionOut, categoryName: String) {
+private fun TransactionRow(transaction: TransactionOut, categoryName: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
