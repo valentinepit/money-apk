@@ -51,6 +51,14 @@ class ImportPreviewViewModel(application: Application) : AndroidViewModel(applic
     var categories by mutableStateOf<List<CategoryOut>>(emptyList())
         private set
 
+    // Отдельное состояние для диалога "Новая категория" — по той же причине,
+    // что и в CategoryListViewModel: ошибка сохранения не должна перекрывать
+    // уже загруженный список строк превью.
+    var isSavingCategory by mutableStateOf(false)
+        private set
+    var categorySaveError by mutableStateOf<String?>(null)
+        private set
+
     private val categoryByLine = mutableStateMapOf<Int, String>()
     private val excludedLines = mutableStateMapOf<Int, Boolean>()
 
@@ -94,6 +102,52 @@ class ImportPreviewViewModel(application: Application) : AndroidViewModel(applic
 
     fun setExcluded(lineNo: Int, excluded: Boolean) {
         excludedLines[lineNo] = excluded
+    }
+
+    /**
+     * Создаёт новую категорию прямо из превью импорта (когда среди уже
+     * существующих нет подходящей) и сразу назначает её строке [forLineNo].
+     * Список категорий перезагружается целиком, чтобы новая категория стала
+     * видна и в выпадающих списках остальных строк.
+     */
+    fun createCategory(name: String, forLineNo: Int, onDone: () -> Unit) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) {
+            categorySaveError = "Введите название категории."
+            return
+        }
+        isSavingCategory = true
+        categorySaveError = null
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.categoryApi.createCategory(trimmed)
+                val created = response.body()?.data
+                if (response.isSuccessful && created != null) {
+                    val categoriesResponse = RetrofitClient.categoryApi.listCategories()
+                    categories = if (categoriesResponse.isSuccessful) {
+                        categoriesResponse.body()?.data.orEmpty()
+                    } else {
+                        categories + created
+                    }
+                    categoryByLine[forLineNo] = created.id
+                    isSavingCategory = false
+                    onDone()
+                } else {
+                    isSavingCategory = false
+                    categorySaveError = "Сервер вернул ошибку (код ${response.code()})"
+                }
+            } catch (e: IOException) {
+                isSavingCategory = false
+                categorySaveError = "Не удалось связаться с сервером."
+            } catch (e: Exception) {
+                isSavingCategory = false
+                categorySaveError = "Непредвиденная ошибка: ${e.message}"
+            }
+        }
+    }
+
+    fun clearCategorySaveError() {
+        categorySaveError = null
     }
 
     fun confirm(sessionId: String, onDone: () -> Unit) {

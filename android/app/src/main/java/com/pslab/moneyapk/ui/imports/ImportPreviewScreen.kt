@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -65,6 +66,11 @@ fun ImportPreviewScreen(
     val uiState = viewModel.uiState
     val confirmState = viewModel.confirmState
 
+    // Строка, для которой открыт диалог "Новая категория" — null, если диалог
+    // закрыт. Живёт здесь (а не во ViewModel), потому что это чисто состояние
+    // навигации по UI, не данные, которые нужно переживать смерть процесса.
+    var addCategoryForLine by remember { mutableStateOf<Int?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -110,6 +116,7 @@ fun ImportPreviewScreen(
                             isExcluded = viewModel::isExcluded,
                             onCategoryChange = viewModel::setCategory,
                             onExcludeChange = viewModel::setExcluded,
+                            onRequestNewCategory = { lineNo -> addCategoryForLine = lineNo },
                             confirmState = confirmState,
                             onConfirm = { viewModel.confirm(sessionId, onDone) }
                         )
@@ -117,6 +124,23 @@ fun ImportPreviewScreen(
                 }
             }
         }
+    }
+
+    val lineForNewCategory = addCategoryForLine
+    if (lineForNewCategory != null) {
+        AddCategoryDialog(
+            isSaving = viewModel.isSavingCategory,
+            errorMessage = viewModel.categorySaveError,
+            onDismiss = {
+                addCategoryForLine = null
+                viewModel.clearCategorySaveError()
+            },
+            onConfirm = { name ->
+                viewModel.createCategory(name, forLineNo = lineForNewCategory) {
+                    addCategoryForLine = null
+                }
+            }
+        )
     }
 }
 
@@ -173,6 +197,7 @@ private fun PreviewContent(
     isExcluded: (Int) -> Boolean,
     onCategoryChange: (Int, String) -> Unit,
     onExcludeChange: (Int, Boolean) -> Unit,
+    onRequestNewCategory: (Int) -> Unit,
     confirmState: ImportConfirmUiState,
     onConfirm: () -> Unit
 ) {
@@ -200,7 +225,8 @@ private fun PreviewContent(
                         categoryName = categoriesById[categoryIdFor(row.lineNo)]?.name ?: "Другое",
                         excluded = isExcluded(row.lineNo),
                         onCategoryChange = { categoryId -> onCategoryChange(row.lineNo, categoryId) },
-                        onExcludeChange = { excluded -> onExcludeChange(row.lineNo, excluded) }
+                        onExcludeChange = { excluded -> onExcludeChange(row.lineNo, excluded) },
+                        onRequestNewCategory = { onRequestNewCategory(row.lineNo) }
                     )
                 }
             }
@@ -247,7 +273,8 @@ private fun PreviewRow(
     categoryName: String,
     excluded: Boolean,
     onCategoryChange: (String) -> Unit,
-    onExcludeChange: (Boolean) -> Unit
+    onExcludeChange: (Boolean) -> Unit,
+    onRequestNewCategory: () -> Unit
 ) {
     var categoryExpanded by remember { mutableStateOf(false) }
 
@@ -306,6 +333,16 @@ private fun PreviewRow(
                         expanded = categoryExpanded,
                         onDismissRequest = { categoryExpanded = false }
                     ) {
+                        // Пункт создания категории — на случай, если среди
+                        // существующих нет подходящей прямо во время импорта,
+                        // без ухода на отдельный экран "Категории".
+                        DropdownMenuItem(
+                            text = { Text("+ Новая категория") },
+                            onClick = {
+                                categoryExpanded = false
+                                onRequestNewCategory()
+                            }
+                        )
                         categories.forEach { category ->
                             DropdownMenuItem(
                                 text = { Text(category.name) },
@@ -320,4 +357,49 @@ private fun PreviewRow(
             }
         }
     }
+}
+
+@Composable
+private fun AddCategoryDialog(
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Новая категория") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Название") },
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name) }, enabled = !isSaving) {
+                Text(if (isSaving) "Сохранение..." else "Добавить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
+                Text("Отмена")
+            }
+        }
+    )
 }
