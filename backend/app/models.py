@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
@@ -101,6 +102,13 @@ class Category(CreatedAtMixin, BaseModel):
 
 class Transaction(CreatedAtMixin, BaseModel):
     __tablename__ = "transactions"
+    __table_args__ = (
+        # Ускоряет проверку дублей при импорте (см. app/services/import_service.py) —
+        # там ищем среди транзакций пользователя совпадения по external_ref.
+        # Не UniqueConstraint: у ручных транзакций и у банков без номера операции
+        # external_ref = NULL, а несколько NULL допустимы у обычного индекса.
+        Index("ix_transactions_user_id_external_ref", "user_id", "external_ref"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id"), nullable=False)
@@ -116,6 +124,12 @@ class Transaction(CreatedAtMixin, BaseModel):
     import_session_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_sessions.id"), nullable=True
     )
+    # Уникальный номер операции, присвоенный банком (не нами) — берётся из
+    # ParsedTransaction.external_ref при импорте (app/parsers/base.py).
+    # NULL для ручных транзакций и для банков/форматов, где такого номера нет.
+    # Используется для защиты от дублей при повторном импорте той же выписки
+    # (см. claude/plan.md, фаза 6; app/services/import_service.py).
+    external_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
