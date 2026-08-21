@@ -1,6 +1,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.1
 sqlalchemy==2.0.52
+greenlet==3.5.5  # нужен SQLAlchemy для асинхронного ORM (async engine/session), сам по себе неявная зависимость
 asyncpg==0.31.0  # приложение (async engine/session)
 psycopg2-binary==2.9.12  # только Alembic-миграции (см. alembic/env.py) — они синхронные
 alembic==1.19.1

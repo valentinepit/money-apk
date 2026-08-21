@@ -98,6 +98,48 @@ async def test_create_transaction_with_category(client, auth_headers, groceries_
     assert response.json()["data"]["category_id"] == str(groceries_category.id)
 
 
+async def test_create_transaction_with_zero_amount_returns_422(client, auth_headers):
+    response = await client.post(
+        "/api/v1/transactions",
+        data={"amount": 0, "transaction_date": "2026-08-05"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+async def test_create_transaction_with_negative_amount_returns_422(client, auth_headers):
+    response = await client.post(
+        "/api/v1/transactions",
+        data={"amount": -5, "transaction_date": "2026-08-05"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+async def test_update_transaction_with_non_positive_amount_returns_422(
+    client, auth_headers, db_session, user, default_category
+):
+    transaction = Transaction(
+        user_id=user.id,
+        category_id=default_category.id,
+        amount=10,
+        merchant_raw="",
+        merchant_normalized="",
+        transaction_date=date(2026, 8, 5),
+        source=TransactionSource.manual,
+    )
+    db_session.add(transaction)
+    await db_session.flush()
+
+    response = await client.patch(
+        f"/api/v1/transactions/{transaction.id}", data={"amount": 0}, headers=auth_headers
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
 async def test_list_transactions_excludes_deleted_and_paginates(
     client, auth_headers, db_session, user, default_category
 ):

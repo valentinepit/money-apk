@@ -38,3 +38,39 @@ class ConflictError(DomainError):
 class CategoryIsSystemError(ConflictError):
     def __init__(self, message: str = "Системную категорию нельзя удалить") -> None:
         super().__init__("category_is_system", message)
+
+
+class RuleIsSystemError(ConflictError):
+    def __init__(self, message: str = "Системное правило нельзя удалить") -> None:
+        super().__init__("rule_is_system", message)
+
+
+class UnknownStatementFormatError(DomainError):
+    """Ни один из зарегистрированных парсеров (app/parsers/) не подошёл к файлу."""
+
+    def __init__(self, message: str = "Формат файла выписки не распознан") -> None:
+        super().__init__(message)
+
+
+class StatementParseError(DomainError):
+    """Формат файла распознан (can_parse=True), но разобрать содержимое не удалось."""
+
+    def __init__(self, message: str = "Не удалось разобрать файл выписки") -> None:
+        super().__init__(message)
+
+
+class SessionAlreadyConfirmedError(ConflictError):
+    """confirm/delete на уже подтверждённой импорт-сессии (см. api-contract.md)."""
+
+    def __init__(self, message: str = "Импорт-сессия уже подтверждена") -> None:
+        super().__init__("session_already_confirmed", message)
+
+
+class ImportSessionNotConfirmableError(ConflictError):
+    """confirm на сессии без превью (status=failed/uploaded) — решение сверх контракта,
+
+    чтобы не пытаться создавать транзакции из отсутствующего parsed_preview.
+    """
+
+    def __init__(self, message: str = "Импорт-сессию нельзя подтвердить в текущем статусе") -> None:
+        super().__init__("import_session_not_confirmable", message)

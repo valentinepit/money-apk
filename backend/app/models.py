@@ -44,15 +44,8 @@ class RuleSource(str, enum.Enum):
 
 
 class BaseModel(Base):
-    """Общий базовый класс всех ORM-моделей.
-
-    Выносит сюда то, что нужно каждой модели, чтобы не дублировать в каждом
-    классе:
-    - первичный ключ `id` (UUID);
-    - `to_dict()` — сериализация модели в словарь для мест, где неудобно
-      тащить Pydantic-схему (скрипты, сиды, дебаг, логирование и т.п.;
-      HTTP-ответы всё равно идут через `response_model=`-схемы, см.
-      `app/schemas/responses.py`).
+    """
+    Общий базовый класс всех ORM-моделей.
     """
 
     __abstract__ = True
@@ -134,11 +127,8 @@ class Transaction(CreatedAtMixin, BaseModel):
 
 
 class ImportSession(CreatedAtMixin, BaseModel):
-    """Одна загрузка одного файла выписки.
-
-    Счёт/банк не выбирается пользователем — bank_parser определяется автоматически
-    при парсинге по содержимому файла (см. app.import_parsers), а не по привязке
-    к какому-либо Account (сущности Account в модели нет — см. docs/plan.md).
+    """
+    Одна загрузка одного файла выписки.
     """
 
     __tablename__ = "import_sessions"

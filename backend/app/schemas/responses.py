@@ -6,7 +6,7 @@
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr
 
@@ -68,6 +68,53 @@ class ReportMeta(BaseModel):
     total_overall: float
 
 
+class CategorizationRuleOut(BaseModel):
+    id: uuid.UUID
+    merchant_pattern: str
+    category_id: uuid.UUID
+    source: str
+
+    model_config = {"from_attributes": True}
+
+
+class ImportSessionOut(BaseModel):
+    id: uuid.UUID
+    file_name: str
+    file_type: str
+    bank_parser: str | None
+    status: str
+    error_message: str | None
+    created_at: datetime
+    confirmed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class ImportPreviewRowOut(BaseModel):
+    """Одна строка превью распознанного файла (см. api-contract.md, "Import").
+
+    Строится не из ORM-объекта, а из словаря внутри ImportSession.parsed_preview
+    (JSONB) — from_attributes не нужен, pydantic валидирует обычный dict.
+    """
+
+    line_no: int
+    merchant_raw: str
+    merchant_normalized: str
+    amount: float
+    transaction_date: date
+    suggested_category_id: uuid.UUID
+    suggested_category_source: str
+
+
+class ImportSessionDetailData(BaseModel):
+    import_session: ImportSessionOut
+    preview: list[ImportPreviewRowOut]
+
+
+class ImportConfirmData(BaseModel):
+    created_transactions: list[TransactionOut]
+
+
 class TokenDataResponse(BaseModel):
     data: TokenResponse
 
@@ -96,3 +143,19 @@ class TransactionListResponse(BaseModel):
 class ReportListResponse(BaseModel):
     data: list[ReportRowOut]
     meta: ReportMeta
+
+
+class CategorizationRuleListResponse(BaseModel):
+    data: list[CategorizationRuleOut]
+
+
+class ImportSessionDetailResponse(BaseModel):
+    data: ImportSessionDetailData
+
+
+class ImportSessionListResponse(BaseModel):
+    data: list[ImportSessionOut]
+
+
+class ImportConfirmResponse(BaseModel):
+    data: ImportConfirmData

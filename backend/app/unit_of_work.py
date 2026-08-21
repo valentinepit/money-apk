@@ -21,6 +21,10 @@ from app.repositories.categorization_rules import (
     AbstractCategorizationRuleRepository,
     SqlAlchemyCategorizationRuleRepository,
 )
+from app.repositories.import_sessions import (
+    AbstractImportSessionRepository,
+    SqlAlchemyImportSessionRepository,
+)
 from app.repositories.transactions import AbstractTransactionRepository, SqlAlchemyTransactionRepository
 from app.repositories.users import AbstractUserRepository, SqlAlchemyUserRepository
 
@@ -29,6 +33,7 @@ class AbstractUnitOfWork(ABC):
     categories: AbstractCategoryRepository
     transactions: AbstractTransactionRepository
     categorization_rules: AbstractCategorizationRuleRepository
+    import_sessions: AbstractImportSessionRepository
     users: AbstractUserRepository
 
     async def __aenter__(self) -> "AbstractUnitOfWork":
@@ -68,6 +73,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.categories = SqlAlchemyCategoryRepository(self.session)
         self.transactions = SqlAlchemyTransactionRepository(self.session)
         self.categorization_rules = SqlAlchemyCategorizationRuleRepository(self.session)
+        self.import_sessions = SqlAlchemyImportSessionRepository(self.session)
         self.users = SqlAlchemyUserRepository(self.session)
         return await super().__aenter__()
 

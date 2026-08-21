@@ -1,0 +1,12 @@
+# Временная надстройка над docker-compose.prod.yml для ПЕРВОГО деплоя —
+# без домена и без HTTPS (см. claude/plan.md, фаза 6). Публикует порт api
+# наружу по IP, без Caddy (caddy-сервис из docker-compose.prod.yml в команде
+# запуска просто не указывается).
+#
+# Когда появится домен: удалить этот файл и запускать все три сервиса
+# (db, api, caddy) из docker-compose.prod.yml — тогда HTTPS настроится сам
+# через Caddy/Let's Encrypt, а этот порт открывать наружу больше не нужно.
+services:
+  api:
+    ports:
+      - "8000:8000"
