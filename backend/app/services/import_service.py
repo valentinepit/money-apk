@@ -97,9 +97,34 @@ async def create_import_session(
         await uow.commit()
         return session
 
+    # Защита от дублей при повторном импорте (см. claude/plan.md, фаза 6):
+    # строки, для которых уже есть транзакция пользователя, не попадают в
+    # preview повторно. Основной способ — совпадение external_ref (номер
+    # операции, присвоенный банком); запасной — для строк без external_ref
+    # (банк/формат не предоставляет такого номера) — совпадение по
+    # (дата, сумма, нормализованное название продавца).
+    refs = {line.external_ref for line in parsed_lines if line.external_ref}
+    existing_refs = await uow.transactions.find_existing_external_refs(user_id, refs)
+
+    fallback_keys = {
+        (line.transaction_date, line.amount, normalize_merchant(line.merchant_raw))
+        for line in parsed_lines
+        if not line.external_ref
+    }
+    existing_fallback_keys = await uow.transactions.find_existing_date_amount_merchant(
+        user_id, fallback_keys
+    )
+
     preview = []
     for line in parsed_lines:
         merchant_normalized = normalize_merchant(line.merchant_raw)
+
+        if line.external_ref:
+            if line.external_ref in existing_refs:
+                continue
+        elif (line.transaction_date, line.amount, merchant_normalized) in existing_fallback_keys:
+            continue
+
         category_id, source = await _suggest_category(uow, user_id, merchant_normalized)
         preview.append(
             {
@@ -110,6 +135,11 @@ async def create_import_session(
                 "transaction_date": line.transaction_date.isoformat(),
                 "suggested_category_id": str(category_id),
                 "suggested_category_source": source,
+                # Сохраняем в preview, чтобы при подтверждении (см.
+                # confirm_import_session ниже) перенести на саму Transaction —
+                # иначе следующий импорт той же выписки не сможет опознать
+                # дубль по external_ref (см. claude/plan.md, фаза 6).
+                "external_ref": line.external_ref,
             }
         )
 
@@ -170,6 +200,7 @@ async def confirm_import_session(
             transaction_date=date.fromisoformat(row["transaction_date"]),
             source=TransactionSource.import_,
             import_session_id=session.id,
+            external_ref=row.get("external_ref"),
         )
         await uow.transactions.add(transaction)
         created.append(transaction)

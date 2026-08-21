@@ -49,6 +49,25 @@ class AbstractTransactionRepository(ABC):
         self, user_id: uuid.UUID, date_from: date, date_to: date
     ) -> list[CategoryReportRow]: ...
 
+    @abstractmethod
+    async def find_existing_external_refs(
+        self, user_id: uuid.UUID, refs: set[str]
+    ) -> set[str]:
+        """Из переданных external_ref — те, что уже есть среди (не удалённых)
+        транзакций пользователя. Используется при импорте для защиты от
+        дублей (см. app/services/import_service.py)."""
+        ...
+
+    @abstractmethod
+    async def find_existing_date_amount_merchant(
+        self, user_id: uuid.UUID, keys: set[tuple[date, float, str]]
+    ) -> set[tuple[date, float, str]]:
+        """Запасной вариант защиты от дублей при импорте — для банков/форматов
+        без собственного номера операции (external_ref is None). Из
+        переданных (дата, сумма, нормализованное название продавца) — те,
+        что уже есть среди (не удалённых) транзакций пользователя."""
+        ...
+
 
 class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
     def __init__(self, session: AsyncSession) -> None:
@@ -128,3 +147,35 @@ class SqlAlchemyTransactionRepository(AbstractTransactionRepository):
             )
             for row in result.all()
         ]
+
+    async def find_existing_external_refs(
+        self, user_id: uuid.UUID, refs: set[str]
+    ) -> set[str]:
+        if not refs:
+            return set()
+        stmt = select(Transaction.external_ref).where(
+            Transaction.user_id == user_id,
+            Transaction.deleted_at.is_(None),
+            Transaction.external_ref.in_(refs),
+        )
+        result = await self.session.scalars(stmt)
+        return set(result.all())
+
+    async def find_existing_date_amount_merchant(
+        self, user_id: uuid.UUID, keys: set[tuple[date, float, str]]
+    ) -> set[tuple[date, float, str]]:
+        if not keys:
+            return set()
+        dates = {key[0] for key in keys}
+        stmt = select(
+            Transaction.transaction_date, Transaction.amount, Transaction.merchant_normalized
+        ).where(
+            Transaction.user_id == user_id,
+            Transaction.deleted_at.is_(None),
+            Transaction.transaction_date.in_(dates),
+        )
+        result = await self.session.execute(stmt)
+        existing = {
+            (row.transaction_date, float(row.amount), row.merchant_normalized) for row in result.all()
+        }
+        return keys & existing

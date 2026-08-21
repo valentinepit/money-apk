@@ -332,6 +332,68 @@ async def test_delete_unconfirmed_import_session_removes_it(client, auth_headers
     assert remaining is None
 
 
+async def test_reimporting_same_statement_after_confirm_returns_empty_preview(
+    client, auth_headers, uploaded_seb_session, default_category
+):
+    # Фаза 6 (claude/plan.md): защита от дублей. Подтверждаем первый импорт,
+    # затем загружаем тот же файл ещё раз — все три строки уже есть в базе
+    # (совпадение по external_ref = TRANSAKCIJAS NUMURS), preview должен
+    # оказаться пустым.
+    session_id = uploaded_seb_session["import_session"]["id"]
+    confirm = await client.post(
+        f"/api/v1/import-sessions/{session_id}/confirm", json={"transactions": []}, headers=auth_headers
+    )
+    assert confirm.status_code == 200
+    assert len(confirm.json()["data"]["created_transactions"]) == 3
+
+    response = await client.post(
+        "/api/v1/import-sessions",
+        files={"file": ("kontaparskats.csv", SEB_SAMPLE_CSV.encode("utf-8-sig"), "text/csv")},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["data"]["preview"] == []
+
+
+async def test_reimporting_statement_with_one_new_row_shows_only_the_new_row(
+    client, auth_headers, uploaded_seb_session, default_category
+):
+    # Частичное перекрытие — например следующая выписка снова захватывает
+    # хвост предыдущего периода. Уже занесённые строки не показываются,
+    # новая — показывается.
+    session_id = uploaded_seb_session["import_session"]["id"]
+    confirm = await client.post(
+        f"/api/v1/import-sessions/{session_id}/confirm", json={"transactions": []}, headers=auth_headers
+    )
+    assert confirm.status_code == 200
+
+    extra_row_csv = SEB_SAMPLE_CSV.replace(
+        '"CLR8832956";18.08.2026;"EUR";25.00;"LMT.LV";"";"";"SEB BANKA";"UNLALV2X";'
+        '"16/08/2026 08:48 karte...598360 LMT.LV/80768076/LVA #631727";"RO1997535792L01";'
+        '16.08.2026;"PMNTCCRDOTHR-purchase in POS Dinamo payment card";"";"D";25.00;'
+        '"**** **** **** 8360";"EUR";\n',
+        '"CLR8832956";18.08.2026;"EUR";25.00;"LMT.LV";"";"";"SEB BANKA";"UNLALV2X";'
+        '"16/08/2026 08:48 karte...598360 LMT.LV/80768076/LVA #631727";"RO1997535792L01";'
+        '16.08.2026;"PMNTCCRDOTHR-purchase in POS Dinamo payment card";"";"D";25.00;'
+        '"**** **** **** 8360";"EUR";\n'
+        '"CLR8899999";19.08.2026;"EUR";9.99;"NEW SHOP";"";"";"SEB BANKA";"UNLALV2X";'
+        '"18/08/2026 12:00 karte...598360 NEW SHOP/RIGA/LVA #999999";"RO9999999999L01";'
+        '18.08.2026;"PMNTCCRDOTHR-purchase in POS Dinamo payment card";"";"D";9.99;'
+        '"**** **** **** 8360";"EUR";\n',
+        1,
+    )
+
+    response = await client.post(
+        "/api/v1/import-sessions",
+        files={"file": ("kontaparskats2.csv", extra_row_csv.encode("utf-8-sig"), "text/csv")},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    preview = response.json()["data"]["preview"]
+    assert len(preview) == 1
+    assert preview[0]["merchant_raw"] == "NEW SHOP"
+
+
 async def test_delete_confirmed_import_session_returns_409(client, auth_headers, uploaded_seb_session):
     session_id = uploaded_seb_session["import_session"]["id"]
     confirm = await client.post(
