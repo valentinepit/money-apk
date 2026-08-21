@@ -55,14 +55,27 @@ def test_parse_extracts_all_debit_rows_in_eur():
     result = parser.parse(_sample_bytes())
 
     assert result == [
-        ParsedTransaction(line_no=1, transaction_date=_date(2026, 8, 1), amount=4.96, merchant_raw="AI2SQL"),
+        ParsedTransaction(
+            line_no=1,
+            transaction_date=_date(2026, 8, 1),
+            amount=4.96,
+            merchant_raw="AI2SQL",
+            external_ref="RO1986420819L01",
+        ),
         ParsedTransaction(
             line_no=2,
             transaction_date=_date(2026, 8, 16),
             amount=236.40,
             merchant_raw="AIRBNB * HMFXC5QBRJ",
+            external_ref="RO1996664152L01",
         ),
-        ParsedTransaction(line_no=3, transaction_date=_date(2026, 8, 16), amount=25.00, merchant_raw="LMT.LV"),
+        ParsedTransaction(
+            line_no=3,
+            transaction_date=_date(2026, 8, 16),
+            amount=25.00,
+            merchant_raw="LMT.LV",
+            external_ref="RO1997535792L01",
+        ),
     ]
 
 
@@ -74,6 +87,19 @@ def test_parse_uses_document_date_not_processing_date():
     result = parser.parse(_sample_bytes())
     assert result[1].transaction_date == _date(2026, 8, 16)
     assert result[2].transaction_date == _date(2026, 8, 16)
+
+
+def test_parse_extracts_external_ref_from_transakcijas_numurs_column():
+    # TRANSAKCIJAS NUMURS — уникальный номер операции, присваиваемый банком.
+    # Используется для дедупликации при повторном импорте той же выписки
+    # (см. claude/plan.md, фаза 6; app/services/import_service.py).
+    parser = SebLvCardTransactionsCsvParser()
+    result = parser.parse(_sample_bytes())
+    assert [t.external_ref for t in result] == [
+        "RO1986420819L01",
+        "RO1996664152L01",
+        "RO1997535792L01",
+    ]
 
 
 def test_parse_skips_credit_rows():

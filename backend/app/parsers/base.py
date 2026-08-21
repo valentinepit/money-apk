@@ -26,12 +26,22 @@ class ParsedTransaction:
     пользователь мог сослаться на конкретную строку при подтверждении
     (исключить её или поменять категорию) — см. api-contract.md,
     POST /api/v1/import-sessions/:id/confirm.
+
+    external_ref — уникальный номер операции, который присваивает сам банк
+    (не мы), если он есть в формате выписки (см. claude/plan.md, фаза 6:
+    защита от дублей при повторном импорте). Используется для определения
+    дублей при импорте: строка с уже встречавшимся external_ref не
+    попадает в превью повторно (см. app/services/import_service.py).
+    None — банк/формат не предоставляет такого номера, в этом случае
+    сервис импорта сверяет дубли по (дата, сумма, нормализованное
+    название продавца) как запасной вариант.
     """
 
     line_no: int
     transaction_date: date
     amount: float
     merchant_raw: str
+    external_ref: str | None = None
 
 
 class BankStatementParser(ABC):

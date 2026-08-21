@@ -73,6 +73,10 @@ class SebLvCardTransactionsCsvParser(BankStatementParser):
             transaction_date = self._parse_date(row, line_no)
             amount = self._parse_amount(row, line_no)
             merchant_raw = (row.get("PARTNERA NOSAUKUMS") or "").strip()
+            # TRANSAKCIJAS NUMURS — уникальный номер операции от банка,
+            # используется для дедупликации при повторном импорте (см.
+            # app/parsers/base.py, ParsedTransaction.external_ref).
+            external_ref = (row.get("TRANSAKCIJAS NUMURS") or "").strip() or None
 
             transactions.append(
                 ParsedTransaction(
@@ -80,6 +84,7 @@ class SebLvCardTransactionsCsvParser(BankStatementParser):
                     transaction_date=transaction_date,
                     amount=amount,
                     merchant_raw=merchant_raw,
+                    external_ref=external_ref,
                 )
             )
 

@@ -70,42 +70,49 @@ def test_parse_extracts_all_debit_rows_in_eur():
             transaction_date=date(2026, 8, 5),
             amount=6.90,
             merchant_raw="EUR12026-07-31LTUZACH262176JAR",
+            external_ref="FC5674639244",
         ),
         ParsedTransaction(
             line_no=2,
             transaction_date=date(2026, 8, 18),
             amount=51.93,
             merchant_raw="************7721EUR12026-08-17MAXIMA LV R770RigaLVA576959",
+            external_ref="FC5691039165",
         ),
         ParsedTransaction(
             line_no=3,
             transaction_date=date(2026, 8, 18),
             amount=8.89,
             merchant_raw="************7721EUR12026-08-17MAXIMA LV R770RigaLVA592079",
+            external_ref="FC5691039171",
         ),
         ParsedTransaction(
             line_no=4,
             transaction_date=date(2026, 8, 18),
             amount=6.80,
             merchant_raw="************7721EUR12026-08-16DUS LUDZALUDZALVALTUZACH26230DFL8",
+            external_ref="FC5692420152",
         ),
         ParsedTransaction(
             line_no=5,
             transaction_date=date(2026, 8, 18),
             amount=33.00,
             merchant_raw="************7721EUR12026-08-16PAY*Andaluzijas SunsRigaLVALTUZACH26230DFLF",
+            external_ref="FC5692420158",
         ),
         ParsedTransaction(
             line_no=6,
             transaction_date=date(2026, 8, 18),
             amount=6.78,
             merchant_raw="************7721EUR12026-08-16DUS LUDZALUDZALVALTUZACH26230DFLK",
+            external_ref="FC5692420172",
         ),
         ParsedTransaction(
             line_no=7,
             transaction_date=date(2026, 8, 18),
             amount=21.28,
             merchant_raw="************7721EUR12026-08-16LIDL 143, RIGA, LACPLESARIGALVALTUZACH26230DFLP",
+            external_ref="FC5692420183",
         ),
     ]
 
@@ -116,6 +123,23 @@ def test_parse_keeps_payment_details_verbatim_as_merchant_raw():
     parser = LuminorCsvParser()
     result = parser.parse(_sample_bytes())
     assert result[1].merchant_raw == "************7721EUR12026-08-17MAXIMA LV R770RigaLVA576959"
+
+
+def test_parse_extracts_external_ref_from_transaction_id_column():
+    # Transaction ID — уникальный номер операции, присваиваемый банком.
+    # Используется для дедупликации при повторном импорте той же выписки
+    # (см. claude/plan.md, фаза 6; app/services/import_service.py).
+    parser = LuminorCsvParser()
+    result = parser.parse(_sample_bytes())
+    assert [t.external_ref for t in result] == [
+        "FC5674639244",
+        "FC5691039165",
+        "FC5691039171",
+        "FC5692420152",
+        "FC5692420158",
+        "FC5692420172",
+        "FC5692420183",
+    ]
 
 
 def test_parse_skips_credit_rows():

@@ -81,6 +81,10 @@ class LuminorCsvParser(BankStatementParser):
             transaction_date = self._parse_date(row, line_no)
             amount = self._parse_amount(row, line_no)
             merchant_raw = (row.get("Payment details") or "").strip()
+            # Transaction ID — уникальный номер операции от банка, используется
+            # для дедупликации при повторном импорте (см. app/parsers/base.py,
+            # ParsedTransaction.external_ref).
+            external_ref = (row.get("Transaction ID") or "").strip() or None
 
             transactions.append(
                 ParsedTransaction(
@@ -88,6 +92,7 @@ class LuminorCsvParser(BankStatementParser):
                     transaction_date=transaction_date,
                     amount=amount,
                     merchant_raw=merchant_raw,
+                    external_ref=external_ref,
                 )
             )
 
